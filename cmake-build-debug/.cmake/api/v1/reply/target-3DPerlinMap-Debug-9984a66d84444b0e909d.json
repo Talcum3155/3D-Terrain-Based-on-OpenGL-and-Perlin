@@ -81,7 +81,8 @@
 			"sourceIndexes" : 
 			[
 				13,
-				288
+				288,
+				290
 			]
 		},
 		{
@@ -434,7 +435,8 @@
 				284,
 				285,
 				286,
-				287
+				287,
+				291
 			]
 		},
 		{
@@ -443,7 +445,8 @@
 			[
 				13,
 				288,
-				289
+				289,
+				290
 			]
 		}
 	],
@@ -1901,6 +1904,17 @@
 			"compileGroupIndex" : 1,
 			"path" : "src/glad.c",
 			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "utilities/glfw_tool.cpp",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "utilities/glfw_tool.h",
+			"sourceGroupIndex" : 0
 		}
 	],
 	"type" : "EXECUTABLE"
