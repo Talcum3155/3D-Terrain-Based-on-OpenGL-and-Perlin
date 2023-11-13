@@ -1,0 +1,5 @@
+# ninja log v5
+0	750	7215786923484827	CMakeFiles/3DPerlinMap.dir/main.cpp.obj	cec2ee49902f86b5
+4	1029	7215786926275218	CMakeFiles/3DPerlinMap.dir/src/glad.c.obj	e91ba97830c1d916
+3	2967	7215786945548879	CMakeFiles/3DPerlinMap.dir/include/glm/detail/glm.cpp.obj	55fe65a28c75e8d5
+2967	5454	7215786970482666	3DPerlinMap.exe	9865f2eecbd3c47c
