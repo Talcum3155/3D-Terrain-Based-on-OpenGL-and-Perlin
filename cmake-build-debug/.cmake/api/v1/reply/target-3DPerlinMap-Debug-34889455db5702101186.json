@@ -82,7 +82,8 @@
 			[
 				13,
 				288,
-				290
+				290,
+				292
 			]
 		},
 		{
@@ -436,7 +437,8 @@
 				285,
 				286,
 				287,
-				291
+				291,
+				293
 			]
 		},
 		{
@@ -446,7 +448,8 @@
 				13,
 				288,
 				289,
-				290
+				290,
+				292
 			]
 		}
 	],
@@ -1914,6 +1917,17 @@
 		{
 			"backtrace" : 1,
 			"path" : "utilities/glfw_tool.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
+			"path" : "utilities/shader.cpp",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "utilities/shader.h",
 			"sourceGroupIndex" : 0
 		}
 	],
