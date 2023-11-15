@@ -21,8 +21,16 @@ namespace utilities {
 
         std::vector<unsigned int> shader_ids;
 
+        // For each additional shader, the capacity of shader_id will increase by 1.
+        shader_ids.push_back(
+                create_compile_shader(shader_codes[shader_ids.size()], GL_VERTEX_SHADER, "VERTX"));
+
         // override by inherited class to add shader type, like tese,tesc
         create_compile_shader_delegate(shader_ids, shader_codes);
+
+        shader_ids.push_back(
+                create_compile_shader(shader_codes[shader_ids.size()], GL_FRAGMENT_SHADER, "FRAGMENT"));
+
 
         // shader Program
         id = glCreateProgram();
@@ -103,24 +111,26 @@ namespace utilities {
 
         // Check for errors after compile.
         if (shader_type != "PROGRAM") {
+            std::cout << "Checking errors for " << shader_type << "..." << std::endl;
             glGetShaderiv(shader_id, GL_COMPILE_STATUS, &success_flag);
 
             if (!success_flag) {
                 // get error info
                 glGetShaderInfoLog(shader_id, sizeof(info_log), nullptr, info_log);
                 throw std::runtime_error(
-                        std::string("ERROR::SHADER_COMPILATION_ERROR of type: ") + shader_type + info_log);
+                        std::string("ERROR::SHADER_COMPILATION_ERROR of type: ") + shader_type + "\n" + info_log);
             }
         }
             // Check for errors during shader compilation.
         else {
+            std::cout << "Checking errors for PROGRAM..." << std::endl;
             glGetProgramiv(shader_id, GL_LINK_STATUS, &success_flag);
 
             if (!success_flag) {
                 // get error info
                 glGetProgramInfoLog(shader_id, sizeof(info_log), nullptr, info_log);
                 throw std::runtime_error(
-                        std::string("ERROR::PROGRAM_LINKING_ERROR of type: ") + shader_type + info_log);
+                        std::string("ERROR::PROGRAM_LINKING_ERROR of type: \n") + shader_type + "\n" + info_log);
             }
         }
     }

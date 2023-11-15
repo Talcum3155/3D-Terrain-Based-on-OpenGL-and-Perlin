@@ -60,6 +60,11 @@ namespace utilities {
         // store all paths
         std::vector<std::string> shader_paths;
 
+        /**
+         * Override by an inherited class to add shader types, like tese and tesc.
+         * @param shader_ids
+         * @param shader_codes
+         */
         inline virtual void
         create_compile_shader_delegate(std::vector<unsigned int> &shader_ids,
                                        std::vector<std::string> &shader_codes) const;
@@ -88,11 +93,6 @@ namespace utilities {
     inline void
     shader::create_compile_shader_delegate(std::vector<unsigned int> &shader_ids,
                                            std::vector<std::string> &shader_codes) const {
-        // For each additional shader, the capacity of shader_id will increase by 1.
-        shader_ids.push_back(
-                create_compile_shader(shader_codes[shader_ids.size()], GL_VERTEX_SHADER, "VERTX"));
-        shader_ids.push_back(
-                create_compile_shader(shader_codes[shader_ids.size()], GL_FRAGMENT_SHADER, "FRAGMENT"));
     }
 
     /**

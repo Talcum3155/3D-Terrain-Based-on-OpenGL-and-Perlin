@@ -1,5 +1,5 @@
 #include "utilities/glfw_tool.h"
-#include "utilities/shader.h"
+#include "utilities/shader_t.h"
 
 const int width = 800;
 const int height = 600;
@@ -17,7 +17,11 @@ int main() {
         return -1;
     }
 
-    utilities::shader shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"), std::string("PerlinMap.frag"));
+//    utilities::shader_t shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"),
+//                                       std::string("PerlinMap.frag"),std::string("PerlinMap.tesc"),std::string("PerlinMap.tese"));
+
+    utilities::shader shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"),
+                                       std::string("PerlinMap.frag"));
 
     float vertices[] = {
             // positions         // colors
