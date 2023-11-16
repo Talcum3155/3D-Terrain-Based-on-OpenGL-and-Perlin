@@ -1,6 +1,9 @@
+#define STB_IMAGE_IMPLEMENTATION
+
 #include "utilities/glfw_tool.h"
 #include "utilities/shader_t.h"
 #include "utilities/camera.h"
+
 
 const int width = 800;
 const int height = 600;

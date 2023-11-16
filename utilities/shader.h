@@ -24,7 +24,7 @@ namespace utilities {
         unsigned int id = 0;
         bool compiled_flag = false;
 
-        inline shader(std::string &&absolute_path, std::string &&vert_path, std::string &&frag_path);
+        inline shader(std::string &&absolute_path, std::string &&vert_name, std::string &&frag_name);
 
         ~shader() = default;
 
@@ -32,29 +32,29 @@ namespace utilities {
 
         inline void use();
 
-        inline void set_bool(const std::string &name, bool value) const;
+        inline shader &set_bool(const std::string &name, bool value) const;
 
-        inline void set_int(const std::string &name, int value) const;
+        inline shader &set_int(const std::string &name, int value) const;
 
-        inline void set_float(const std::string &name, float value) const;
+        inline shader &set_float(const std::string &name, float value) const;
 
-        inline void set_vec2(const std::string &name, glm::vec2 &value) const;
+        inline shader &set_vec2(const std::string &name, glm::vec2 &value) const;
 
-        inline void set_vec2(const std::string &name, float x, float y) const;
+        inline shader &set_vec2(const std::string &name, float x, float y) const;
 
-        inline void set_vec3(const std::string &name, const glm::vec3 &value) const;
+        inline shader &set_vec3(const std::string &name, const glm::vec3 &value) const;
 
-        inline void set_vec3(const std::string &name, float x, float y, float z) const;
+        inline shader &set_vec3(const std::string &name, float x, float y, float z) const;
 
-        inline void set_vec4(const std::string &name, const glm::vec4 &value) const;
+        inline shader &set_vec4(const std::string &name, const glm::vec4 &value) const;
 
-        inline void set_vec4(const std::string &name, float x, float y, float z, float w) const;
+        inline shader &set_vec4(const std::string &name, float x, float y, float z, float w) const;
 
-        inline void set_mat2(const std::string &name, const glm::mat2 &mat) const;
+        inline shader &set_mat2(const std::string &name, const glm::mat2 &mat) const;
 
-        inline void set_mat3(const std::string &name, const glm::mat3 &mat) const;
+        inline shader &set_mat3(const std::string &name, const glm::mat3 &mat) const;
 
-        inline void set_mat4(const std::string &name, const glm::mat4 &mat) const;
+        inline shader &set_mat4(const std::string &name, const glm::mat4 &mat) const;
 
     protected:
         // store all paths
@@ -80,9 +80,9 @@ namespace utilities {
     };
 
     inline
-    shader::shader(std::string &&absolute_path, std::string &&vert_path, std::string &&frag_path) {
-        shader_paths.emplace_back(absolute_path + vert_path);
-        shader_paths.emplace_back(absolute_path + frag_path);
+    shader::shader(std::string &&absolute_path, std::string &&vert_name, std::string &&frag_name) {
+        shader_paths.emplace_back(absolute_path + vert_name);
+        shader_paths.emplace_back(absolute_path + frag_name);
     }
 
     /**
@@ -107,64 +107,76 @@ namespace utilities {
 
 #pragma region control_shaders
 
-    inline void
+    inline shader &
     shader::set_bool(const std::string &name, bool value) const {
         glUniform1i(glGetUniformLocation(id, name.c_str()), static_cast<int>(value));
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_int(const std::string &name, int value) const {
         glUniform1i(glGetUniformLocation(id, name.c_str()), value);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_float(const std::string &name, float value) const {
         glUniform1f(glGetUniformLocation(id, name.c_str()), value);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_vec2(const std::string &name, glm::vec2 &value) const {
         glUniform2fv(glGetUniformLocation(id, name.c_str()), 1, &value[0]);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_vec2(const std::string &name, float x, float y) const {
         glUniform2f(glGetUniformLocation(id, name.c_str()), x, y);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_vec3(const std::string &name, const glm::vec3 &value) const {
         glUniform3fv(glGetUniformLocation(id, name.c_str()), 1, &value[0]);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_vec3(const std::string &name, float x, float y, float z) const {
         glUniform3f(glGetUniformLocation(id, name.c_str()), x, y, z);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_vec4(const std::string &name, const glm::vec4 &value) const {
         glUniform4fv(glGetUniformLocation(id, name.c_str()), 1, &value[0]);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_vec4(const std::string &name, float x, float y, float z, float w) const {
         glUniform4f(glGetUniformLocation(id, name.c_str()), x, y, z, w);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_mat2(const std::string &name, const glm::mat2 &mat) const {
         glUniformMatrix2fv(glGetUniformLocation(id, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_mat3(const std::string &name, const glm::mat3 &mat) const {
         glUniformMatrix3fv(glGetUniformLocation(id, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+        return const_cast<shader &>(*this);
     }
 
-    inline void
+    inline shader &
     shader::set_mat4(const std::string &name, const glm::mat4 &mat) const {
         glUniformMatrix4fv(glGetUniformLocation(id, name.c_str()), 1, GL_FALSE, &mat[0][0]);
+        return const_cast<shader &>(*this);
     }
 
 #pragma endregion control_shaders

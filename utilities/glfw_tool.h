@@ -8,6 +8,7 @@
 #include <iostream>
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <stb_image.h>
 
 #include "camera.h"
 
@@ -33,6 +34,9 @@ namespace utilities {
 
     void
     scroll_callback(GLFWwindow *window, double, double y_offset, camera &cam);
+
+    unsigned int
+    load_texture(std::string &&absolute_path, std::string &&texture_name);
 }
 
 #endif //INC_3DPERLINMAP_GLFW_TOOL_H

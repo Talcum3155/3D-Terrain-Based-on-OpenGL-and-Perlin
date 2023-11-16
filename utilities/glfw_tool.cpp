@@ -63,7 +63,7 @@ namespace utilities {
         GLFWwindow *window = init_window(window_name, width, height);
 
         // capture mouse
-        glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         // store pointer to window
         glfwSetWindowUserPointer(window, &cam);
@@ -125,6 +125,13 @@ namespace utilities {
             cam.process_key_input(RIGHT, delta_time);
     }
 
+    /**
+     * Get mouse current position
+     * @param window window instance
+     * @param x_pos_in current x value
+     * @param y_pos_in current y value
+     * @param cam camera instance
+     */
     void
     mouse_callback(GLFWwindow *window, double x_pos_in, double y_pos_in, camera &cam) {
         glm::vec2 pos(static_cast<float>(x_pos_in), static_cast<float>(y_pos_in));
@@ -145,8 +152,65 @@ namespace utilities {
         cam.process_mouse_movement(x_offset, y_offset, true);
     }
 
+    /**
+     * Get mouse scroll offset
+     * @param window window instance
+     * @param y_offset mouse y offset
+     * @param cam camera instance
+     */
     void
     scroll_callback(GLFWwindow *window, double, double y_offset, camera &cam) {
         cam.process_mouse_scroll(static_cast<float>(y_offset));
+    }
+
+    /**
+     * Load texture data from path
+     * @param absolute_path path prefix
+     * @param texture_name texture full name
+     * @return texture id
+     */
+    unsigned int
+    load_texture(std::string &&absolute_path, std::string &&texture_name) {
+        unsigned int texture_id;
+        glGenTextures(1, &texture_id);
+
+        int width, height, nrComponents;
+        unsigned char *data = stbi_load(std::string(absolute_path + texture_name).c_str(), &width, &height,
+                                        &nrComponents, 0);
+        if (data) {
+            GLenum format;
+            switch (format) {
+                case 1L:
+                    format = GL_RED;
+                    break;
+                case 3L:
+                    format = GL_RGB;
+                    break;
+                case 4L:
+                    format = GL_RGBA;
+                default:
+                    format = GL_RGB;
+            }
+
+            glBindTexture(GL_TEXTURE_2D, texture_id);
+            glTexImage2D(GL_TEXTURE_2D, 0, static_cast<int>(format), width, height, 0, format, GL_UNSIGNED_BYTE, data);
+            // generate mipmap for texture
+            glGenerateMipmap(GL_TEXTURE_2D);
+
+            // set texture wrapping
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            // set texture filtering
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            stbi_image_free(data);
+
+        } else {
+            stbi_image_free(data);
+            throw std::runtime_error("Texture failed to load at path: " + absolute_path + texture_name);
+        }
+
+        return texture_id;
     }
 }

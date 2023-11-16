@@ -11,8 +11,8 @@ namespace utilities {
 
     class shader_t : public shader {
     public:
-        inline shader_t(std::string &&absolute_path, std::string &&vert_path,
-                        std::string &&frag_path, std::string &&tesc_path, std::string &&tese_path);
+        inline shader_t(std::string &&absolute_path, std::string &&vert_name,
+                        std::string &&frag_name, std::string &&tesc_name, std::string &&tese_name);
 
         ~shader_t() = default;
 
@@ -25,14 +25,14 @@ namespace utilities {
 
     inline
     shader_t::shader_t(std::string &&absolute_path,
-                       std::string &&vert_path, std::string &&frag_path,
-                       std::string &&tesc_path, std::string &&tese_path)
+                       std::string &&vert_name, std::string &&frag_name,
+                       std::string &&tesc_name, std::string &&tese_name)
             : shader(std::forward<std::string>(absolute_path),
-                     std::forward<std::string>(vert_path),
-                     std::forward<std::string>(frag_path)) {
+                     std::forward<std::string>(vert_name),
+                     std::forward<std::string>(frag_name)) {
         // Ensure the correct order of shaders
-        shader_paths.insert(shader_paths.begin() + 1, absolute_path + tese_path);
-        shader_paths.insert(shader_paths.begin() + 1, absolute_path + tesc_path);
+        shader_paths.insert(shader_paths.begin() + 1, absolute_path + tese_name);
+        shader_paths.insert(shader_paths.begin() + 1, absolute_path + tesc_name);
     }
 
     /**
