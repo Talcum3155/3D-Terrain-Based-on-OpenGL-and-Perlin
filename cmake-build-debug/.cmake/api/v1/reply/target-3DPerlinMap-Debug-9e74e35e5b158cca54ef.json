@@ -440,7 +440,8 @@
 				287,
 				291,
 				293,
-				295
+				295,
+				296
 			]
 		},
 		{
@@ -1914,6 +1915,17 @@
 		{
 			"backtrace" : 1,
 			"compileGroupIndex" : 0,
+			"path" : "utilities/camera.cpp",
+			"sourceGroupIndex" : 1
+		},
+		{
+			"backtrace" : 1,
+			"path" : "utilities/camera.h",
+			"sourceGroupIndex" : 0
+		},
+		{
+			"backtrace" : 1,
+			"compileGroupIndex" : 0,
 			"path" : "utilities/glfw_tool.cpp",
 			"sourceGroupIndex" : 1
 		},
@@ -1932,12 +1944,6 @@
 			"backtrace" : 1,
 			"path" : "utilities/shader.h",
 			"sourceGroupIndex" : 0
-		},
-		{
-			"backtrace" : 1,
-			"compileGroupIndex" : 0,
-			"path" : "utilities/shader_t.cpp",
-			"sourceGroupIndex" : 1
 		},
 		{
 			"backtrace" : 1,

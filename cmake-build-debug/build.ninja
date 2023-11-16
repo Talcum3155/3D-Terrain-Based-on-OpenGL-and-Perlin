@@ -70,6 +70,13 @@ build CMakeFiles/3DPerlinMap.dir/src/glad.c.obj: C_COMPILER__3DPerlinMap_unscann
   OBJECT_DIR = CMakeFiles\3DPerlinMap.dir
   OBJECT_FILE_DIR = CMakeFiles\3DPerlinMap.dir\src
 
+build CMakeFiles/3DPerlinMap.dir/utilities/camera.cpp.obj: CXX_COMPILER__3DPerlinMap_unscanned_Debug D$:/Programming/CPP/OpenGL/3DPerlinMap/utilities/camera.cpp || cmake_object_order_depends_target_3DPerlinMap
+  DEP_FILE = CMakeFiles\3DPerlinMap.dir\utilities\camera.cpp.obj.d
+  FLAGS = -g -std=gnu++20 -fdiagnostics-color=always
+  INCLUDES = -ID:/Programming/CPP/OpenGL/3DPerlinMap/include
+  OBJECT_DIR = CMakeFiles\3DPerlinMap.dir
+  OBJECT_FILE_DIR = CMakeFiles\3DPerlinMap.dir\utilities
+
 build CMakeFiles/3DPerlinMap.dir/utilities/glfw_tool.cpp.obj: CXX_COMPILER__3DPerlinMap_unscanned_Debug D$:/Programming/CPP/OpenGL/3DPerlinMap/utilities/glfw_tool.cpp || cmake_object_order_depends_target_3DPerlinMap
   DEP_FILE = CMakeFiles\3DPerlinMap.dir\utilities\glfw_tool.cpp.obj.d
   FLAGS = -g -std=gnu++20 -fdiagnostics-color=always
@@ -84,13 +91,6 @@ build CMakeFiles/3DPerlinMap.dir/utilities/shader.cpp.obj: CXX_COMPILER__3DPerli
   OBJECT_DIR = CMakeFiles\3DPerlinMap.dir
   OBJECT_FILE_DIR = CMakeFiles\3DPerlinMap.dir\utilities
 
-build CMakeFiles/3DPerlinMap.dir/utilities/shader_t.cpp.obj: CXX_COMPILER__3DPerlinMap_unscanned_Debug D$:/Programming/CPP/OpenGL/3DPerlinMap/utilities/shader_t.cpp || cmake_object_order_depends_target_3DPerlinMap
-  DEP_FILE = CMakeFiles\3DPerlinMap.dir\utilities\shader_t.cpp.obj.d
-  FLAGS = -g -std=gnu++20 -fdiagnostics-color=always
-  INCLUDES = -ID:/Programming/CPP/OpenGL/3DPerlinMap/include
-  OBJECT_DIR = CMakeFiles\3DPerlinMap.dir
-  OBJECT_FILE_DIR = CMakeFiles\3DPerlinMap.dir\utilities
-
 
 # =============================================================================
 # Link build statements for EXECUTABLE target 3DPerlinMap
@@ -99,7 +99,7 @@ build CMakeFiles/3DPerlinMap.dir/utilities/shader_t.cpp.obj: CXX_COMPILER__3DPer
 #############################################
 # Link the executable 3DPerlinMap.exe
 
-build 3DPerlinMap.exe: CXX_EXECUTABLE_LINKER__3DPerlinMap_Debug CMakeFiles/3DPerlinMap.dir/include/glm/detail/glm.cpp.obj CMakeFiles/3DPerlinMap.dir/main.cpp.obj CMakeFiles/3DPerlinMap.dir/src/glad.c.obj CMakeFiles/3DPerlinMap.dir/utilities/glfw_tool.cpp.obj CMakeFiles/3DPerlinMap.dir/utilities/shader.cpp.obj CMakeFiles/3DPerlinMap.dir/utilities/shader_t.cpp.obj | D$:/Programming/CPP/OpenGL/3DPerlinMap/lib/glfw3.dll
+build 3DPerlinMap.exe: CXX_EXECUTABLE_LINKER__3DPerlinMap_Debug CMakeFiles/3DPerlinMap.dir/include/glm/detail/glm.cpp.obj CMakeFiles/3DPerlinMap.dir/main.cpp.obj CMakeFiles/3DPerlinMap.dir/src/glad.c.obj CMakeFiles/3DPerlinMap.dir/utilities/camera.cpp.obj CMakeFiles/3DPerlinMap.dir/utilities/glfw_tool.cpp.obj CMakeFiles/3DPerlinMap.dir/utilities/shader.cpp.obj | D$:/Programming/CPP/OpenGL/3DPerlinMap/lib/glfw3.dll
   FLAGS = -g
   LINK_LIBRARIES = D:/Programming/CPP/OpenGL/3DPerlinMap/lib/glfw3.dll  -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32
   LINK_PATH = -LD:/Programming/CPP/OpenGL/3DPerlinMap/lib

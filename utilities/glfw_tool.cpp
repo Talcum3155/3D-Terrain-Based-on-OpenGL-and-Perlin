@@ -49,6 +49,29 @@ namespace utilities {
         return window;
     }
 
+    GLFWwindow *
+    init_window(const char *window_name, camera &cam, bool &first_move, glm::vec2 &last_pos, int width, int height) {
+        GLFWwindow *window = init_window(window_name, width, height);
+
+        // store pointer to window
+        glfwSetWindowUserPointer(window, &cam);
+
+        // call the function when the mouse moves
+        glfwSetCursorPosCallback(window, [](GLFWwindow *target_window, double x_pos_in, double y_pos_in) {
+            // got pointer from window and cat it to camera
+            auto *got_camera = static_cast<camera *>(glfwGetWindowUserPointer(target_window));
+            mouse_callback(target_window,x_pos_in,y_pos_in,*got_camera);
+        });
+        //call the function when the mouse scrolls
+        glfwSetScrollCallback(window, [](GLFWwindow *target_window, double, double y_offset) {
+            auto *got_camera = static_cast<camera *>(glfwGetWindowUserPointer(target_window));
+            scroll_callback(target_window,0.0f ,y_offset,*got_camera);
+        });
+
+        return window;
+    }
+
+
     /**
      * Whenever the window changes in size,
      * GLFW calls this function and fills in the proper arguments
@@ -66,11 +89,52 @@ namespace utilities {
      * @param window target window
      */
     void
-    process_input(GLFWwindow* window) {
+    process_input(GLFWwindow *window) {
         if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
             glfwSetWindowShouldClose(window, true);
         }
     }
 
+    /**
+     * Get keyboard input
+     * @param window target window
+     */
+    void
+    process_input(GLFWwindow *window, camera &cam, float delta_time) {
+        process_input(window);
 
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            cam.process_key_input(FORWARD, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            cam.process_key_input(BACKWARD, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            cam.process_key_input(LEFT, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            cam.process_key_input(RIGHT, delta_time);
+    }
+
+    void
+    mouse_callback(GLFWwindow *window, double x_pos_in, double y_pos_in, camera &cam) {
+        glm::vec2 pos(static_cast<float>(x_pos_in), static_cast<float>(y_pos_in));
+
+        if (cam.first_move) {
+            cam.last_pos.x = pos.x;
+            cam.last_pos.y = pos.y;
+            cam.first_move = false;
+        }
+
+        float x_offset = pos.x - cam.last_pos.x;
+        // reversed since y-coordinates go from bottom to top
+        float y_offset = cam.last_pos.y - pos.y;
+
+        cam.last_pos.x = pos.x;
+        cam.last_pos.y = pos.x;
+
+        cam.process_mouse_movement(x_offset, y_offset);
+    }
+
+    void
+    scroll_callback(GLFWwindow *window, double, double y_offset, camera &cam) {
+        cam.process_mouse_scroll(static_cast<float>(y_offset));
+    }
 }

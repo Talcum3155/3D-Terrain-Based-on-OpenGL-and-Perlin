@@ -12,7 +12,7 @@ link_directories(${PROJECT_SOURCE_DIR}/lib)
 
 file(GLOB_RECURSE SOURCES "*.cpp" "*.h" "*.hpp" "*.c")
 
-# 过滤掉cmake-build-debug文件夹下的文件
+# filter the cmake-build-debug folder
 list(FILTER SOURCES EXCLUDE REGEX "cmake-build-debug/.*")
 
 add_executable(3DPerlinMap ${SOURCES})

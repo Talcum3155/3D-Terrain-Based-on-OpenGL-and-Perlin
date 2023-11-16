@@ -12,7 +12,7 @@ namespace utilities {
     class shader_t : public shader {
     public:
         inline shader_t(std::string &&absolute_path, std::string &&vert_path,
-                        std::string &&frag_path, std::string &&tese_path, std::string &&tesc_path);
+                        std::string &&frag_path, std::string &&tesc_path, std::string &&tese_path);
 
         ~shader_t() = default;
 
