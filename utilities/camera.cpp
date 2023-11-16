@@ -6,17 +6,18 @@
 
 namespace utilities {
 
-    camera::camera(glm::vec3 position, glm::vec3 up, float yaw, float pitch)
-            : position(position), worldUp(up),
-              yaw(yaw), pitch(pitch),
-              forward(glm::vec3(0.0f, 0.0f, -1.0f)),
+    camera::camera(glm::vec2 last_pos, glm::vec3 position, glm::vec3 world_up, float yaw, float pitch)
+            : last_pos(last_pos), position(position), worldUp(world_up),
+              yaw(yaw), pitch(pitch), forward(glm::vec3(0.0f, 0.0f, -1.0f)),
               movement_speed(SPEED), mouse_sensitivity(SENSITIVITY), zoom(ZOOM) {
         update_camera_vectors();
     }
 
-    camera::camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch)
-            : position(posX, posY, posZ), worldUp(upX, upY, upZ),
-              yaw(yaw), pitch(pitch),
+    camera::camera(float pos_x, float pos_y, float pos_z,
+                   float world_up_x, float world_up_y, float world_up_z,
+                   float yaw, float pitch, glm::vec2 last_pos)
+            : last_pos(last_pos), position(pos_x, pos_y, pos_z),
+              worldUp(world_up_x, world_up_y, world_up_z), yaw(yaw), pitch(pitch),
               forward(glm::vec3(0.0f, 0.0f, -1.0f)),
               movement_speed(SPEED), mouse_sensitivity(SENSITIVITY), zoom(ZOOM) {
         update_camera_vectors();
@@ -31,6 +32,7 @@ namespace utilities {
     camera::process_key_input(camera_movement direction, float delta_time) {
         float velocity = movement_speed * delta_time;
 
+        std::cout << "direction: " << direction << std::endl;
         switch (direction) {
             case FORWARD:
                 position += forward * velocity;
@@ -45,6 +47,7 @@ namespace utilities {
                 position += right * velocity;
                 break;
         }
+        std::cout << "current position: " << position.x << ", " << position.y << ", " << position.z << std::endl;
     }
 
     /**
@@ -60,7 +63,10 @@ namespace utilities {
 
         yaw += x_offset;
         // constrain the max and min value of pitch
-        pitch = constrain_pitch ? std::clamp(pitch + y_offset, -89.0f, 89.0f) : pitch;
+        pitch = constrain_pitch ? std::clamp(pitch + y_offset, -89.0f, 89.0f) : pitch + y_offset;
+
+        std::cout << "current yaw: " << yaw << std::endl;
+        std::cout << "current pitch: " << pitch << std::endl;
 
         // update Front, Right and Up Vectors using the updated Euler angles
         update_camera_vectors();

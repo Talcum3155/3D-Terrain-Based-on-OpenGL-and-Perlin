@@ -12,6 +12,8 @@ namespace utilities {
      */
     void
     shader::build_shader() {
+        if (compiled_flag) return;
+
         std::vector<std::string> shader_codes;
 
         // load all shader codes

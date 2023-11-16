@@ -11,6 +11,7 @@
 
 #include <vector>
 #include <algorithm>
+#include <iostream>
 
 namespace utilities {
 
@@ -47,16 +48,21 @@ namespace utilities {
         float zoom;
 
         // control various
-        bool first_move;
+        bool first_move = true;
+        // store mouse last position to compute yaw and pitch
         glm::vec2 last_pos;
 
-        camera(glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
-               glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
+        camera(glm::vec2 last_pos, glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
+               glm::vec3 world_up = glm::vec3(0.0f, 1.0f, 0.0f),
                float yaw = YAW, float pitch = PITCH);
 
-        camera(float posX, float posY, float posZ, float upX, float upY, float upZ, float yaw, float pitch);
+        camera(float pos_x, float pos_y, float pos_z,
+               float world_up_x, float world_up_y, float world_up_z,
+               float yaw, float pitch, glm::vec2 last_pos);
 
-        inline glm::mat4 get_view_matrix();
+        [[nodiscard]] inline glm::mat4 get_view_matrix() const;
+
+        [[nodiscard]] inline glm::mat4 get_projection_matrix(int width, int height, float z_near = 0.1f, float z_far = 100.0f) const;
 
         void process_key_input(camera_movement direction, float delta_time);
 
@@ -83,11 +89,26 @@ namespace utilities {
      * @return coordinate transformation matrix
      */
     inline glm::mat4
-    camera::get_view_matrix() {
+    camera::get_view_matrix() const {
         // first parameter: camera position
         // second parameter: look direction
         // third parameter: world up direction
         return glm::lookAt(position, position + camera::forward, camera::up);
+    }
+
+    /**
+     * Return the projection matrix based on window resolution, near plane, far plane
+     * @param width
+     * @param height
+     * @param z_near near plane
+     * @param z_far far plane
+     * @return projection matrix
+     */
+    inline glm::mat4
+    camera::get_projection_matrix(int width, int height, float z_near, float z_far) const {
+        return glm::perspective(glm::radians(zoom),
+                                static_cast<float>(width) / static_cast<float>(height),
+                                z_near, z_far);
     }
 }
 

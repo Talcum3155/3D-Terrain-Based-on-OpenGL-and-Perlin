@@ -11,6 +11,7 @@ namespace utilities {
      * @param width window width
      * @param height window height
      * @param window_name window name
+     * @return window
      */
     GLFWwindow *
     init_window(const char *window_name, int width, int height) {
@@ -49,23 +50,34 @@ namespace utilities {
         return window;
     }
 
+    /**
+     * create a window with camera
+     * @param window_name window name
+     * @param cam camera instance
+     * @param width window width
+     * @param height window height
+     * @return window
+     */
     GLFWwindow *
-    init_window(const char *window_name, camera &cam, bool &first_move, glm::vec2 &last_pos, int width, int height) {
+    init_window(const char *window_name, camera &cam, int width, int height) {
         GLFWwindow *window = init_window(window_name, width, height);
+
+        // capture mouse
+        glfwSetInputMode(window,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
 
         // store pointer to window
         glfwSetWindowUserPointer(window, &cam);
 
         // call the function when the mouse moves
         glfwSetCursorPosCallback(window, [](GLFWwindow *target_window, double x_pos_in, double y_pos_in) {
-            // got pointer from window and cat it to camera
+            // got pointer from window and cast it to camera
             auto *got_camera = static_cast<camera *>(glfwGetWindowUserPointer(target_window));
-            mouse_callback(target_window,x_pos_in,y_pos_in,*got_camera);
+            mouse_callback(target_window, x_pos_in, y_pos_in, *got_camera);
         });
         //call the function when the mouse scrolls
         glfwSetScrollCallback(window, [](GLFWwindow *target_window, double, double y_offset) {
             auto *got_camera = static_cast<camera *>(glfwGetWindowUserPointer(target_window));
-            scroll_callback(target_window,0.0f ,y_offset,*got_camera);
+            scroll_callback(target_window, 0.0f, y_offset, *got_camera);
         });
 
         return window;
@@ -128,9 +140,9 @@ namespace utilities {
         float y_offset = cam.last_pos.y - pos.y;
 
         cam.last_pos.x = pos.x;
-        cam.last_pos.y = pos.x;
+        cam.last_pos.y = pos.y;
 
-        cam.process_mouse_movement(x_offset, y_offset);
+        cam.process_mouse_movement(x_offset, y_offset, true);
     }
 
     void
