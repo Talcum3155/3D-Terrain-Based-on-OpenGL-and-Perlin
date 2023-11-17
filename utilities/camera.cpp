@@ -32,7 +32,7 @@ namespace utilities {
     camera::process_key_input(camera_movement direction, float delta_time) {
         float velocity = movement_speed * delta_time;
 
-        std::cout << "direction: " << direction << std::endl;
+//        std::cout << "direction: " << direction << std::endl;
         switch (direction) {
             case FORWARD:
                 position += forward * velocity;
@@ -47,7 +47,7 @@ namespace utilities {
                 position += right * velocity;
                 break;
         }
-        std::cout << "current position: " << position.x << ", " << position.y << ", " << position.z << std::endl;
+//        std::cout << "current position: " << position.x << ", " << position.y << ", " << position.z << std::endl;
     }
 
     /**
@@ -65,8 +65,8 @@ namespace utilities {
         // constrain the max and min value of pitch
         pitch = constrain_pitch ? std::clamp(pitch + y_offset, -89.0f, 89.0f) : pitch + y_offset;
 
-        std::cout << "current yaw: " << yaw << std::endl;
-        std::cout << "current pitch: " << pitch << std::endl;
+//        std::cout << "current yaw: " << yaw << std::endl;
+//        std::cout << "current pitch: " << pitch << std::endl;
 
         // update Front, Right and Up Vectors using the updated Euler angles
         update_camera_vectors();

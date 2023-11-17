@@ -114,11 +114,9 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glm::mat4 projection = cam.get_projection_matrix(width, height);
-        shader_program.set_mat4("projection", projection);
 
         // camera/view transformation
         glm::mat4 view = cam.get_view_matrix();
-        shader_program.set_mat4("view", view);
 
         // render the triangle
         glBindVertexArray(VAO);
@@ -126,7 +124,11 @@ int main() {
         // calculate the model matrix for each object and pass it to shader before drawing
         glm::mat4 model = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
         model = glm::rotate(model, glm::radians(0.0f), glm::vec3(1.0f, 0.3f, 0.5f));
-        shader_program.set_mat4("model", model);
+
+        shader_program
+                .set_mat4("projection", projection)
+                .set_mat4("view", view)
+                .set_mat4("model", model);
 
         glDrawArrays(GL_TRIANGLES, 0, 36);
 

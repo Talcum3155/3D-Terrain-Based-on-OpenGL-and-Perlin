@@ -74,3 +74,6 @@
 5	840	7218456746161713	CMakeFiles/3DPerlinMap.dir/utilities/glfw_tool.cpp.obj	21523127ecce2d67
 3	1395	7218456751694592	CMakeFiles/3DPerlinMap.dir/main.cpp.obj	cec2ee49902f86b5
 1395	4172	7218456779418933	3DPerlinMap.exe	d0c5399792a44900
+8	1081	7219260748128892	CMakeFiles/3DPerlinMap.dir/utilities/camera.cpp.obj	8b91efc0fa03b6bc
+4	1714	7219260754443459	CMakeFiles/3DPerlinMap.dir/main.cpp.obj	cec2ee49902f86b5
+1714	4365	7219260780919559	3DPerlinMap.exe	d0c5399792a44900
