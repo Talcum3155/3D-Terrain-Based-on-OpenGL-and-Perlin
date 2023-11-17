@@ -171,28 +171,36 @@ namespace utilities {
      */
     unsigned int
     load_texture(std::string &&absolute_path, std::string &&texture_name) {
+        int dummy_width, dummy_height;
+        return load_texture(std::forward<std::string>(absolute_path),
+                            std::forward<std::string>(texture_name),
+                            dummy_width, dummy_height); // discard height and width
+    }
+
+    unsigned int
+    load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height) {
         unsigned int texture_id;
         glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_2D, texture_id);
 
-        int width, height, nrComponents;
+        int nrComponents;
         unsigned char *data = stbi_load(std::string(absolute_path + texture_name).c_str(), &width, &height,
                                         &nrComponents, 0);
         if (data) {
-            GLenum format;
-            switch (format) {
-                case 1L:
+            GLenum format = 0;
+            switch (nrComponents) {
+                case 1:
                     format = GL_RED;
                     break;
-                case 3L:
+                case 3:
                     format = GL_RGB;
                     break;
-                case 4L:
+                case 4:
                     format = GL_RGBA;
+                    break;
                 default:
                     format = GL_RGB;
             }
-
-            glBindTexture(GL_TEXTURE_2D, texture_id);
             glTexImage2D(GL_TEXTURE_2D, 0, static_cast<int>(format), width, height, 0, format, GL_UNSIGNED_BYTE, data);
             // generate mipmap for texture
             glGenerateMipmap(GL_TEXTURE_2D);
@@ -211,6 +219,7 @@ namespace utilities {
             throw std::runtime_error("Texture failed to load at path: " + absolute_path + texture_name);
         }
 
+        glBindTexture(GL_TEXTURE_2D, 0);
         return texture_id;
     }
 }

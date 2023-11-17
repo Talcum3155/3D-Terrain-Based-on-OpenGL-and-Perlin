@@ -37,6 +37,10 @@ namespace utilities {
 
     unsigned int
     load_texture(std::string &&absolute_path, std::string &&texture_name);
+
+
+    unsigned int
+    load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height);
 }
 
 #endif //INC_3DPERLINMAP_GLFW_TOOL_H
