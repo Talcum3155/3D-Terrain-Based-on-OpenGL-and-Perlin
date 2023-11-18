@@ -3,6 +3,7 @@
 #include "utilities/glfw_tool.h"
 #include "utilities/shader_t.h"
 #include "utilities/camera.h"
+#include "terrain/terrain_tool.h"
 
 
 const int SCR_WIDTH = 800;
@@ -44,64 +45,15 @@ int main() {
 
     int map_width = 0;
     int map_height = 0;
+
     // load height map
-    unsigned int height_map_id = utilities::load_texture("../assets/images/", "render.png", map_width, map_height);
-    glBindTexture(GL_TEXTURE_2D, height_map_id);
-    glActiveTexture(GL_TEXTURE0);
-    shader_program.set_int("world_map", 0);
+    unsigned int height_map_id
+            = utilities::load_texture("../assets/images/", "render.png", map_width, map_height);
 
     std::vector<float> vertices;
-
     const unsigned patch_numbers = 20;
 
-    auto map_width_f = static_cast<float>(map_width);
-    auto map_height_f = static_cast<float>(map_height);
-
-    // compute the coordinates of every corner of each panel
-
-    // compute the reciprocal once to minimize performance impact
-    const float patch_reciprocal = 1.0f / static_cast<float>(patch_numbers);
-
-    // divide the width and height
-    float width_offset_factor = static_cast<float>(map_width) * patch_reciprocal;
-    float height_offset_factor = static_cast<float>(map_height) * patch_reciprocal;
-
-    for (auto i = 0; i <= patch_numbers - 1; ++i) {
-        auto x = static_cast<float>(i);
-
-        for (auto j = 0; j <= patch_numbers - 1; ++j) {
-
-            auto z = static_cast<float>(j);
-
-            // coordinates of the left lower corner of the panel
-            vertices.push_back(-map_width_f * 0.5f + x * width_offset_factor);
-            vertices.push_back(0.0f);
-            vertices.push_back(-map_height_f * 0.5f + z * height_offset_factor);
-            vertices.push_back(x * patch_reciprocal);
-            vertices.push_back(z * patch_reciprocal);
-
-            // coordinates of the right lower corner of the panel
-            vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
-            vertices.push_back(0.0f);
-            vertices.push_back(-map_height_f * 0.5f + z * height_offset_factor);
-            vertices.push_back((x + 1) * patch_reciprocal);
-            vertices.push_back(z * patch_reciprocal);
-
-            // coordinates of the left upper corner of the panel
-            vertices.push_back(-map_width_f * 0.5f + x * width_offset_factor);
-            vertices.push_back(0.0f);
-            vertices.push_back(-map_height_f * 0.5f + (z + 1) * height_offset_factor);
-            vertices.push_back(x * patch_reciprocal);
-            vertices.push_back((z + 1) * patch_reciprocal);
-
-            // coordinates of the right upper corner of the panel
-            vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
-            vertices.push_back(0.0f);
-            vertices.push_back(-map_height_f * 0.5f + (z + 1) * height_offset_factor);
-            vertices.push_back((x + 1) * patch_reciprocal);
-            vertices.push_back((z + 1) * patch_reciprocal);
-        }
-    }
+    terrain::generate_terrain_vertices(map_width, map_height, patch_numbers, vertices);
 
     std::cout << "Loaded " << patch_numbers * patch_numbers << " patches of 4 control points each" << std::endl;
     std::cout << "Processing " << patch_numbers * patch_numbers * 4 << " vertices in vertex shader" << std::endl;
@@ -128,8 +80,12 @@ int main() {
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
 
     shader_program.use();
+    shader_program.set_int("height_map", 0);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, height_map_id);
+
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
 
         // per-frame time logic
