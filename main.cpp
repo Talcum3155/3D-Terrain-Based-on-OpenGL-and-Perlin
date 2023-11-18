@@ -5,7 +5,6 @@
 #include "utilities/camera.h"
 #include "terrain/terrain_tool.h"
 
-
 const int SCR_WIDTH = 800;
 const int SCR_HEIGHT = 600;
 const unsigned short NUM_PATCH_PTS = 4;
@@ -110,7 +109,7 @@ int main() {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 100000.0f);
+        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 1000.0f);
 
         // camera/view transformation
         glm::mat4 view = cam.get_view_matrix();

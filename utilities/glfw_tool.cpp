@@ -165,7 +165,6 @@ namespace utilities {
         }
 
         cool_down -= delta_time;
-        std::cout << "cool_down2: " << cool_down << std::endl;
     }
 
     /**
