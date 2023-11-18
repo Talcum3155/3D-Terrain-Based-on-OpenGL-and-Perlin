@@ -29,6 +29,8 @@ int main() {
         return -1;
     }
 
+    utilities::create_im_gui_context(window, "#version 460");
+
     GLint maxTessLevel;
     glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
     std::cout << "Max available tess level: " << maxTessLevel << std::endl;
@@ -85,8 +87,15 @@ int main() {
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, height_map_id);
 
+    // callback for im_gui
+    std::function<void()> gui_config_callback = [&]() {
+        ImGui::Text("time = %f", glfwGetTime());
+    };
+
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
+
+        utilities::config_im_gui_loop("Debug", gui_config_callback);
 
         // per-frame time logic
         // --------------------
@@ -94,7 +103,7 @@ int main() {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        utilities::process_input(window, cam, deltaTime);
+        utilities::process_input(window, cam, deltaTime,0.5f);
 
         // render
         // ------
@@ -119,17 +128,22 @@ int main() {
 
         glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
 
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
         // swap the color buffer
         glfwSwapBuffers(window);
         // checks if any events are triggered per frame
         glfwPollEvents();
     }
 
-    // optional: de-allocate all resources once they've outlived their purpose:
-    // ------------------------------------------------------------------------
     glDeleteVertexArrays(1, &terrainVAO);
     glDeleteBuffers(1, &terrainVBO);
     glDeleteProgram(shader_program.id);
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
 
     glfwTerminate();
     return 0;

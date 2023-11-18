@@ -33,6 +33,7 @@ namespace utilities {
 
         // make the context of window the main context on the current thread.
         glfwMakeContextCurrent(window);
+        glfwSwapInterval(1); // Enable vsync
 
         //  load the address of the OpenGL function pointers which is OS-specific.
         if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
@@ -108,8 +109,10 @@ namespace utilities {
     }
 
     /**
-     * Get keyboard input
+     * Get keyboard input with camera
      * @param window target window
+     * @param cam target camera
+     * @param delta_time delta time between frames
      */
     void
     process_input(GLFWwindow *window, camera &cam, float delta_time) {
@@ -123,6 +126,46 @@ namespace utilities {
             cam.process_key_input(LEFT, delta_time);
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
             cam.process_key_input(RIGHT, delta_time);
+    }
+
+    /**
+     * Get keyboard input with camera and gui
+     * @param window target window
+     * @param cam target camera
+     * @param delta_time delta time between frames
+     * @param keyboard_cool_down
+     */
+    void
+    process_input(GLFWwindow *window, camera &cam, float delta_time, float keyboard_cool_down) {
+
+        // check whether the key that switches the GUI
+        // is triggered within the time of cool down
+        static float cool_down;
+
+        process_input(window);
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+            cam.process_key_input(FORWARD, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+            cam.process_key_input(BACKWARD, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+            cam.process_key_input(LEFT, delta_time);
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+            cam.process_key_input(RIGHT, delta_time);
+
+        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS && cool_down <= 0.0f) {
+            if (cam.enable_mouse_movement) {
+                cam.enable_mouse_movement = false;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            } else {
+                cam.enable_mouse_movement = true;
+                glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            }
+            cool_down = keyboard_cool_down;
+        }
+
+        cool_down -= delta_time;
+        std::cout << "cool_down2: " << cool_down << std::endl;
     }
 
     /**
@@ -221,5 +264,36 @@ namespace utilities {
 
         glBindTexture(GL_TEXTURE_2D, 0);
         return texture_id;
+    }
+
+    void
+    create_im_gui_context(GLFWwindow *window, std::string &&glsl_version) {
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO &io = ImGui::GetIO();
+        (void) io;
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+
+        // Second param install_callback=true will install GLFW callbacks and chain to existing ones.
+        ImGui_ImplGlfw_InitForOpenGL(window, true);
+        ImGui_ImplOpenGL3_Init(glsl_version.c_str());
+    }
+
+    void
+    config_im_gui_loop(const char *gui_name, void_callback &callback) {
+        {
+            // Start the Dear ImGui frame
+            ImGui_ImplOpenGL3_NewFrame();
+            ImGui_ImplGlfw_NewFrame();
+            ImGui::NewFrame();
+            ImGui::Begin(gui_name);
+            callback();
+            ImGui::End();
+        }
     }
 }

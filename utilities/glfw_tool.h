@@ -9,10 +9,17 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 #include <stb_image.h>
+#include <functional>
+
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_glfw.h"
+#include "imgui/imgui_impl_opengl3.h"
 
 #include "camera.h"
 
 namespace utilities {
+
+    using void_callback = std::function<void()>;
 
     GLFWwindow *
     init_window(const char *window_name, int width = 1920, int height = 1080);
@@ -38,9 +45,17 @@ namespace utilities {
     unsigned int
     load_texture(std::string &&absolute_path, std::string &&texture_name);
 
-
     unsigned int
     load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height);
+
+    void
+    create_im_gui_context(GLFWwindow *window, std::string &&glsl_version);
+
+    void
+    config_im_gui_loop(const char* gui_name, void_callback &callback);
+
+    void
+    process_input(GLFWwindow *window, camera &cam, float delta_time, float keyboard_cool_down);
 }
 
 #endif //INC_3DPERLINMAP_GLFW_TOOL_H

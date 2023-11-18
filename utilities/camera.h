@@ -31,6 +31,8 @@ namespace utilities {
 
     class camera {
     public:
+        bool enable_mouse_movement = true;
+
         // camera vectors
         glm::vec3 position;
         glm::vec3 forward;
@@ -62,7 +64,8 @@ namespace utilities {
 
         [[nodiscard]] inline glm::mat4 get_view_matrix() const;
 
-        [[nodiscard]] inline glm::mat4 get_projection_matrix(int width, int height, float z_near = 0.1f, float z_far = 100.0f) const;
+        [[nodiscard]] inline glm::mat4
+        get_projection_matrix(int width, int height, float z_near = 0.1f, float z_far = 100.0f) const;
 
         void process_key_input(camera_movement direction, float delta_time);
 

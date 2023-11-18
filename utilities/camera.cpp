@@ -58,6 +58,9 @@ namespace utilities {
      */
     void
     camera::process_mouse_movement(float x_offset, float y_offset, bool constrain_pitch) {
+        if (!enable_mouse_movement)
+            return;
+
         x_offset *= mouse_sensitivity;
         y_offset *= mouse_sensitivity;
 
