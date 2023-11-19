@@ -295,4 +295,10 @@ namespace utilities {
             ImGui::End();
         }
     }
+
+    void
+    render_im_gui(){
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
 }

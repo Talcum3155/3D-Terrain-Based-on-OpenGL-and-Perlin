@@ -44,15 +44,21 @@ int main() {
                                        std::string("PerlinMap.frag"), std::string("PerlinMap.tesc"),
                                        std::string("PerlinMap.tese"));
 
-    int map_width = 0;
-    int map_height = 0;
+    int map_width = 512;
+    int map_height = 512;
 
     // load height map
     unsigned int height_map_id
-            = utilities::load_texture("../assets/images/", "render.png", map_width, map_height);
+            = utilities::load_texture("../assets/images/", "parallax_mapping_height_map.png", map_width, map_height);
+
+//    std::vector<float> height_data(map_width * map_height, 1.0f);
+//    for (int i = 0; i < map_width * map_height * 0.5; ++i) {
+//        height_data[i] = 0.0f;
+//    }
+//    unsigned int height_map_id = terrain::load_height_map(map_width, map_height, height_data);
 
     std::vector<float> vertices;
-    const unsigned patch_numbers = 20;
+    const unsigned patch_numbers = 10;
 
     terrain::generate_terrain_vertices(map_width, map_height, patch_numbers, vertices);
 
@@ -102,7 +108,7 @@ int main() {
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
-        utilities::process_input(window, cam, deltaTime,0.5f);
+        utilities::process_input(window, cam, deltaTime, 0.5f);
 
         // render
         // ------
@@ -127,8 +133,7 @@ int main() {
 
         glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
 
-        ImGui::Render();
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+        utilities::render_im_gui();
 
         // swap the color buffer
         glfwSwapBuffers(window);

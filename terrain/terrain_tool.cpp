@@ -67,4 +67,34 @@ namespace terrain {
         }
     }
 
+    /**
+     * load height data from height map as a texture
+     * @param map_width
+     * @param map_height
+     * @param height_data noise height map data
+     * @return texture id
+     */
+    unsigned int
+    load_height_map(const int &map_width, const int &map_height, std::vector<float> &height_data) {
+        unsigned int texture_id;
+        glGenTextures(1, &texture_id);
+        glBindTexture(GL_TEXTURE_2D, texture_id);
+
+        // use GL_RED format
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, map_width, map_height, 0, GL_RED, GL_FLOAT, height_data.data());
+
+        // generate mipmap for texture
+        glGenerateMipmap(GL_TEXTURE_2D);
+
+        // set texture wrapping
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        // set texture filtering
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        glBindTexture(GL_TEXTURE_2D, 0);
+        return texture_id;
+    }
+
 }

@@ -31,7 +31,7 @@ void main() {
     // interpolate the real coordinates of texture along the v-axis
     vec2 tex_coord = (t1 - t0) * v + t0;
 
-    height = texture(height_map, tex_coord).y * 64.0f - 16.0f;
+    height = texture(height_map, tex_coord).x * 64.0f - 16.0f;
 
     // Retrieve the four model coordinates of corners of the panel
     vec4 p00 = gl_in[0].gl_Position;
@@ -44,12 +44,12 @@ void main() {
     // vector of v
     vec4 v_vector = p10 - p00;
     // compute normal
-    vec4 normal = normalize(vec4(cross(v_vector.xyz, u_vector.xyz), 0));
+//    vec4 normal = normalize(vec4(cross(v_vector.xyz, u_vector.xyz), 0));
 
     // bilinearly interpolate model coodinates across patch
     vec4 p0 = (p01 - p00) * u + p00;
     vec4 p1 = (p11 - p10) * u + p10;
-    vec4 p = (p1 - p0) * v + p0 + normal * height;
+    vec4 p = (p1 - p0) * v + p0 + vec4(0, height, 0, 1);
 
     // perform the MVP (Model-View-Projection) transformation.
     gl_Position = projection * view * model * p;

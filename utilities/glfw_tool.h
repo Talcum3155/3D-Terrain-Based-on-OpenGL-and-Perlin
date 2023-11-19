@@ -55,6 +55,9 @@ namespace utilities {
     config_im_gui_loop(const char* gui_name, void_callback &callback);
 
     void
+    render_im_gui();
+
+    void
     process_input(GLFWwindow *window, camera &cam, float delta_time, float keyboard_cool_down);
 }
 
