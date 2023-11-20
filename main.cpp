@@ -1,7 +1,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 
 #include "utilities/glfw_tool.h"
-#include "utilities/shader_t.h"
+#include "utilities/shader_g_t.h"
 #include "utilities/camera.h"
 #include "terrain/terrain_tool.h"
 
@@ -37,12 +37,13 @@ int main() {
     // enable depth test
     glEnable(GL_DEPTH_TEST);
 
-//    utilities::shader_t shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"),
-//                                       std::string("PerlinMap.frag"),std::string("PerlinMap.tesc"),std::string("PerlinMap.tese"));
-
     utilities::shader_t shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"),
                                        std::string("PerlinMap.frag"), std::string("PerlinMap.tesc"),
                                        std::string("PerlinMap.tese"));
+
+    utilities::shader_g_t shader_program_debug(std::string("../shaders/"), std::string("NormalTest.vert"),
+                                               std::string("NormalTest.frag"), std::string("NormalTest.tesc"),
+                                               std::string("NormalTest.tese"), std::string("NormalTest.geom"));
 
     int map_width = 512;
     int map_height = 512;
@@ -89,12 +90,21 @@ int main() {
     shader_program.use();
     shader_program.set_int("height_map", 0);
 
+    shader_program_debug.use();
+    shader_program_debug.set_int("height_map", 0);
+
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, height_map_id);
+
+
+    float y_value = 0.1f;
+    float HEIGHT_SCALE = 0.1f; // may be 2.6 is best
 
     // callback for im_gui
     std::function<void()> gui_config_callback = [&]() {
         ImGui::Text("time = %f", glfwGetTime());
+        ImGui::SliderFloat("Y: ",&y_value,0,0.2f);
+        ImGui::SliderFloat("HEIGHT_SCALE: ",&HEIGHT_SCALE,0.5f,50.f);
     };
 
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -115,7 +125,7 @@ int main() {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 1000.0f);
+        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 10000.0f);
 
         // camera/view transformation
         glm::mat4 view = cam.get_view_matrix();
@@ -123,6 +133,7 @@ int main() {
         // calculate the model matrix for each object and pass it to shader before drawing
         glm::mat4 model = glm::mat4(1.0f);
 
+        shader_program.use();
         shader_program
                 .set_mat4("projection", projection)
                 .set_mat4("view", view)
@@ -130,6 +141,16 @@ int main() {
 
         // render the triangle
         glBindVertexArray(terrainVAO);
+
+        glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+
+        shader_program_debug.use();
+        shader_program_debug
+                .set_mat4("projection", projection)
+                .set_mat4("view", view)
+                .set_mat4("model", model)
+                .set_float("y_value", y_value)
+                .set_float("HEIGHT_SCALE",HEIGHT_SCALE);
 
         glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
 
