@@ -58,8 +58,8 @@ void calculate_normal_2(vec2 tex_coord) {
 
 void calculate_normal_3(vec2 tex_coord) {
 
-    float uTexelSize = 1.0 / 256.0;
-    float vTexelSize = 1.0 / 256.0;
+    float uTexelSize = 1.0 / 512.0;
+    float vTexelSize = 1.0 / 512.0;
     float HEIGHT_SCALE = 0.5f;
 
     // Sample heights around the current texture coordinate
@@ -69,13 +69,8 @@ void calculate_normal_3(vec2 tex_coord) {
     float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
 
     // Calculate normals by taking cross products and averaging
-    vec3 normalLeft = normalize(cross(vec3(0.0, 1.0, left - right), vec3(1.0, 0.0, 0.0)));
-    vec3 normalUp = normalize(cross(vec3(up - down, 0.0, 1.0), vec3(0.0, 1.0, 0.0)));
 
-    // Average the normals
-//    vs_out.normal = normalize(normalLeft + normalUp);
-
-//    vs_out.normal = normalize(vec3(left - right, y_value, down - up));
+    vs_out.normal = normalize(vec3(left - right, y_value, down - up));
     mat3 normalMatrix = transpose(inverse(mat3(view * model)));
     vs_out.normal = normalize(normalMatrix * vs_out.normal);
 }
@@ -99,9 +94,9 @@ void main() {
     // interpolate the real coordinates of texture along the v-axis
     vec2 tex_coord = (t1 - t0) * v + t0;
 
-    float height = texture(height_map, tex_coord).x * 64.0f - 16.0f;
+    float height = texture(height_map, tex_coord).x * 200.0f - 80.0f;
 
-    calculate_normal_1(tex_coord);
+//    calculate_normal_1(tex_coord);
     //    calculate_normal_2(tex_coord);
 
     // Retrieve the four model coordinates of corners of the panel
