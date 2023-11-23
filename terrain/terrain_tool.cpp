@@ -29,6 +29,9 @@ namespace terrain {
         float width_offset_factor = static_cast<float>(map_width) * patch_reciprocal;
         float height_offset_factor = static_cast<float>(map_height) * patch_reciprocal;
 
+        float u_offset_factor = static_cast<float>(map_width) / static_cast<float>((map_width + 2) * patch_numbers);
+        float v_offset_factor = static_cast<float>(map_height) / static_cast<float>((map_height + 2) * patch_numbers);
+
         for (auto i = 0; i <= patch_numbers - 1; ++i) {
             auto x = static_cast<float>(i);
 
@@ -40,29 +43,29 @@ namespace terrain {
                 vertices.push_back(-map_width_f * 0.5f + x * width_offset_factor);
                 vertices.push_back(0.0f);
                 vertices.push_back(-map_height_f * 0.5f + z * height_offset_factor);
-                vertices.push_back(x * patch_reciprocal + u_offset);
-                vertices.push_back(z * patch_reciprocal + v_offset);
+                vertices.push_back(x * u_offset_factor + u_offset);
+                vertices.push_back(z * v_offset_factor + v_offset);
 
                 // coordinates of the right lower corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
                 vertices.push_back(0.0f);
                 vertices.push_back(-map_height_f * 0.5f + z * height_offset_factor);
-                vertices.push_back((x + 1) * patch_reciprocal + u_offset);
-                vertices.push_back(z * patch_reciprocal + v_offset);
+                vertices.push_back((x + 1) * u_offset_factor + u_offset);
+                vertices.push_back(z * v_offset_factor + v_offset);
 
                 // coordinates of the left upper corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + x * width_offset_factor);
                 vertices.push_back(0.0f);
                 vertices.push_back(-map_height_f * 0.5f + (z + 1) * height_offset_factor);
-                vertices.push_back(x * patch_reciprocal + u_offset);
-                vertices.push_back((z + 1) * patch_reciprocal + v_offset);
+                vertices.push_back(x * u_offset_factor + u_offset);
+                vertices.push_back((z + 1) * v_offset_factor + v_offset);
 
                 // coordinates of the right upper corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
                 vertices.push_back(0.0f);
                 vertices.push_back(-map_height_f * 0.5f + (z + 1) * height_offset_factor);
-                vertices.push_back((x + 1) * patch_reciprocal + u_offset);
-                vertices.push_back((z + 1) * patch_reciprocal + v_offset);
+                vertices.push_back((x + 1) * u_offset_factor + u_offset);
+                vertices.push_back((z + 1) * v_offset_factor + v_offset);
             }
         }
     }
@@ -162,8 +165,39 @@ namespace terrain {
         }
     }
 
+    void
+    get_height_map(std::vector<float> &height_map, siv::PerlinNoise &perlin, const int &map_width,
+                   const int &map_height, float scale, int layer_count, float x_offset, float y_offset) {
+
+        float x_perlin_offset = x_offset * static_cast<float>(map_width - 2);
+        float y_perlin_offset = y_offset * static_cast<float>(map_height - 2);
+
+        for (int x = 0; x < map_width; ++x) {
+            for (int y = 0; y < map_height; ++y) {
+
+                float sample_x =
+                        (static_cast<float>(x) + x_perlin_offset) * scale;
+                float sample_y =
+                        (static_cast<float>(y) + y_perlin_offset) * scale;
+
+                // sample perlin
+                auto current_pixel_height = static_cast<float>(perlin.octave2D_01(sample_x, sample_y, layer_count));
+
+                height_map[x + y * map_height] = current_pixel_height;
+            }
+        }
+    }
+
+    float
+    get_sign(float value) {
+        return static_cast<float>((value > 0.0f)) - static_cast<float>(value < 0.0f);
+    }
+
     unsigned int
-    create_terrain(std::vector<float>& vertices){
+    create_terrain(std::vector<float> &vertices) {
+        if (vertices.empty())
+            throw std::runtime_error("vertices vector is empty!!!");
+
         unsigned int terrain_vao, terrain_vbo;
         glGenVertexArrays(1, &terrain_vao);
         glBindVertexArray(terrain_vao);

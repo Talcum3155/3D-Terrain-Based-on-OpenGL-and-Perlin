@@ -28,8 +28,15 @@ namespace terrain {
                    const int &map_height, float scale, int layer_count,float lacunarity, float layer_lacunarity, float layer_amplitude,
                    float x_offset, float y_offset);
 
+    void
+    get_height_map(std::vector<float> &height_map, siv::PerlinNoise &perlin, const int &map_width,
+                   const int &map_height, float scale, int layer_count, float x_offset, float y_offset);
+
     unsigned int
     create_terrain(std::vector<float>& vertices);
+
+    float
+    get_sign(float value);
 }
 
 #endif //INC_3DPERLINMAP_TERRAIN_TOOL_H

@@ -13,6 +13,8 @@ const unsigned short NUM_PATCH_PTS = 4;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
+const unsigned patch_numbers = 10;
+
 int main() {
 
     utilities::camera cam(glm::vec2(SCR_WIDTH * 0.5f, SCR_HEIGHT * 0.5f), glm::vec3(0.0f, 0.0f, 3.0f));
@@ -45,43 +47,46 @@ int main() {
                                                std::string("NormalTest.frag"), std::string("NormalTest.tesc"),
                                                std::string("NormalTest.tese"), std::string("NormalTest.geom"));
 
-    int map_width = 512;
-    int map_height = 512;
+    int map_width = 64;
+    int map_height = 64;
 
     // load height map
 //    unsigned int height_map_id
 //            = utilities::load_texture("../assets/images/", "iceland.png", map_width, map_height);
 
+    std::vector<float> vertices;
+
+    terrain::generate_terrain_vertices(map_width, map_height, patch_numbers, vertices,
+                                       1.0f / static_cast<float>(map_width + 2), 1.0f / static_cast<float>(map_height + 2));
+
+    // configure the cube's VAO (and terrainVBO)
+    unsigned int terrain_00 = terrain::create_terrain(vertices);
+
     siv::PerlinNoise::seed_type seed = 123456u;
     siv::PerlinNoise perlin(seed);
 
-    std::vector<float> height_data((map_width) * (map_width));
-//    for (int i = 0; i < map_width * map_height * 0.5; ++i) {
-//        height_data[i] = 0.0f;
-//    }
+    std::vector<float> height_data_00((map_width + 2) * (map_height + 2));
+    std::vector<float> height_data_01((map_width + 2) * (map_height + 2));
 
-    float scale = 0.0015f;
+    float scale = 0.05f;
     int layer_count = 5;
     float lacunarity = 1.8f;
     float layer_lacunarity = 0.6f;
     float layer_amplitude = 0.5f;
 
-    terrain::get_height_map(height_data, perlin, map_width, map_height,
-                            scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude, 1.0f, 2.0f);
-    unsigned int height_map_id = terrain::load_height_map(map_width, map_height, height_data);
+//    terrain::get_height_map(height_data, perlin, map_width, map_height,
+//                            scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude, 1.0f, 2.0f);
+    terrain::get_height_map(height_data_00, perlin, map_width + 2, map_height + 2,
+                            scale, layer_count, -100.0f, -100.0f);
+    terrain::get_height_map(height_data_01, perlin, map_width + 2, map_height + 2,
+                            scale, layer_count, -100.0f, -101.0f);
 
-    std::vector<float> vertices;
-    const unsigned patch_numbers = 10;
+    unsigned int height_map_id_00 = terrain::load_height_map(map_width + 2, map_height + 2, height_data_00);
+    unsigned int height_map_id_01 = terrain::load_height_map(map_width + 2, map_height + 2, height_data_01);
 
-//    terrain::generate_terrain_vertices(map_width, map_height, patch_numbers, vertices, 1.0f / static_cast<float>(map_width), 1.0f / static_cast<float>(map_height));
-    terrain::generate_terrain_vertices(map_width, map_height, patch_numbers, vertices);
-
-    std::cout << "Loaded " << patch_numbers * patch_numbers << " patches of 4 control points each" << std::endl;
-    std::cout << "Processing " << patch_numbers * patch_numbers * 4 << " vertices in vertex shader" << std::endl;
-    std::cout << "vertices size: " << vertices.size() << std::endl;
-
-    // configure the cube's VAO (and terrainVBO)
-    unsigned int terrainVAO = terrain::create_terrain(vertices);
+//    std::cout << "Loaded " << patch_numbers * patch_numbers << " patches of 4 control points each" << std::endl;
+//    std::cout << "Processing " << patch_numbers * patch_numbers * 4 << " vertices in vertex shader" << std::endl;
+//    std::cout << "vertices size: " << vertices_00.size() << std::endl;
 
     // Specify the number of vertices per patch
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
@@ -93,8 +98,7 @@ int main() {
     shader_program_debug.set_int("height_map", 0);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, height_map_id);
-
+    glBindTexture(GL_TEXTURE_2D, height_map_id_00);
 
     float y_value = 0.1f;
     float HEIGHT_SCALE = 0.1f; // may be 2.6 is best
@@ -108,7 +112,7 @@ int main() {
         ImGui::Checkbox("Show Normal: ", &show_normal);
 
         ImGui::NewLine();
-        ImGui::InputFloat("scale: ",&scale,0,0.00005f,"%.6f");
+        ImGui::InputFloat("scale: ", &scale, 0, 0.00005f, "%.6f");
         ImGui::SliderInt("layer_count: ", &layer_count, 1, 10);
         ImGui::InputFloat("lacunarity: ", &lacunarity, 0, 0.01f);
         ImGui::InputFloat("layer_lacunarity: ", &layer_lacunarity, 0, 0.01f);
@@ -116,22 +120,28 @@ int main() {
 
         if (ImGui::Button("Generate Map")) {
 
-            terrain::get_height_map(height_data, perlin, map_width, map_height,
-                                    scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude, 1.0f, 2.0f);
+//            terrain::get_height_map(height_data, perlin, map_width, map_height,
+//                                    scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude, 1.0f, 2.0f);
 
-            glBindTexture(GL_TEXTURE_2D, height_map_id);
+            terrain::get_height_map(height_data_00, perlin, map_width + 2, map_height + 2,
+                                    scale, layer_count, -1.0f, 0.0f);
+            terrain::get_height_map(height_data_01, perlin, map_width + 2, map_height + 2,
+                                    scale, layer_count, -1.0f, -1.0f);
+
+            glBindTexture(GL_TEXTURE_2D, height_map_id_00);
             // to support non-power-of-two heightmap textures
             glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
             // use GL_RED format
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, map_width, map_height, 0, GL_RED, GL_FLOAT, height_data.data());
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, map_width + 2, map_height + 2, 0, GL_RED, GL_FLOAT,
+                         height_data_00.data());
 
             // generate mipmap for texture
             glGenerateMipmap(GL_TEXTURE_2D);
         }
     };
 
-//    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
 
         utilities::config_im_gui_loop("Debug", gui_config_callback);
@@ -157,16 +167,50 @@ int main() {
         // calculate the model matrix for each object and pass it to shader before drawing
         glm::mat4 model = glm::mat4(1.0f);
 
+        model = glm::translate(model, glm::vec3
+                (
+                        0 * map_width,
+                        0,
+                        0 * map_height
+                ));
+
         shader_program.use();
+        glBindTexture(GL_TEXTURE_2D, height_map_id_00);
         shader_program
                 .set_mat4("projection", projection)
                 .set_mat4("view", view)
                 .set_mat4("model", model);
 
         // render the triangle
-        glBindVertexArray(terrainVAO);
+        glBindVertexArray(terrain_00);
 
         glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+
+        glBindTexture(GL_TEXTURE_2D, height_map_id_01);
+        model = glm::mat4(1.0f);
+        model = glm::translate(model, glm::vec3
+                (
+                        0 * map_width,
+                        0,
+                        -1 * map_height
+                ));
+        shader_program
+                .set_mat4("model", model);
+
+        glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+
+//        model = glm::mat4(1.0f);
+//        model = glm::translate(model, glm::vec3
+//                (
+//                        0 * map_width,
+//                        0,
+//                        2 * (map_height * 0.5f)
+//                ));
+//        shader_program
+//                .set_mat4("model", model);
+//        glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+
+
 
         if (show_normal) {
             shader_program_debug.use();
@@ -188,7 +232,7 @@ int main() {
         glfwPollEvents();
     }
 
-    glDeleteVertexArrays(1, &terrainVAO);
+    glDeleteVertexArrays(1, &terrain_00);
 //    glDeleteBuffers(1, &terrainVBO);
     glDeleteProgram(shader_program.id);
 
