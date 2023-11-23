@@ -129,12 +129,12 @@ namespace terrain {
         for (int i = 0; i < layer_count; ++i) {
             // accumulate height value layer by layer
             max_possible_height += amplitude;
-            // decrease the height layer by layer.
+            // decrease the height layer by layer
             amplitude *= layer_amplitude;
         }
 
-        float x_perlin_offset = x_offset * static_cast<float>(map_width);
-        float y_perlin_offset = y_offset * static_cast<float>(map_height);
+        float x_perlin_offset = x_offset * static_cast<float>(map_width - 2);
+        float y_perlin_offset = y_offset * static_cast<float>(map_height - 2);
 
         for (int x = 0; x < map_width; ++x) {
             for (int y = 0; y < map_height; ++y) {
@@ -144,9 +144,9 @@ namespace terrain {
                 float current_layer_amplitude = 1.0f;
 
                 float sample_x =
-                        (static_cast<float>(x) + x_perlin_offset) * lacunarity * scale;
+                        (static_cast<float>(x) + x_perlin_offset) * scale;
                 float sample_y =
-                        (static_cast<float>(y) + y_perlin_offset) * lacunarity * scale;
+                        (static_cast<float>(y) + y_perlin_offset) * scale;
 
                 for (int i = 0; i < layer_count; ++i) {
                     sample_x *= current_layer_lacunarity;
@@ -165,6 +165,17 @@ namespace terrain {
         }
     }
 
+    /**
+     * Generate perlin noise map by octave function
+     * @param height_map target height map
+     * @param perlin perlin instance
+     * @param map_width width of height map
+     * @param map_height height of height map
+     * @param scale used to scale sample point
+     * @param layer_count layer counts
+     * @param x_offset x sample offset
+     * @param y_offset y sample offset
+     */
     void
     get_height_map(std::vector<float> &height_map, siv::PerlinNoise &perlin, const int &map_width,
                    const int &map_height, float scale, int layer_count, float x_offset, float y_offset) {

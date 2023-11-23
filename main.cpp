@@ -4,6 +4,9 @@
 #include "utilities/shader_g_t.h"
 #include "utilities/camera.h"
 #include "terrain/terrain_tool.h"
+#include "terrain/map_chunk.h"
+
+#include <unordered_map>
 
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
@@ -47,8 +50,11 @@ int main() {
                                                std::string("NormalTest.frag"), std::string("NormalTest.tesc"),
                                                std::string("NormalTest.tese"), std::string("NormalTest.geom"));
 
-    int map_width = 64;
-    int map_height = 64;
+    const int map_width = 512;
+    const int map_height = 512;
+
+    const int texture_width = map_width + 2;
+    const int texture_height = map_height + 2;
 
     // load height map
 //    unsigned int height_map_id
@@ -57,32 +63,42 @@ int main() {
     std::vector<float> vertices;
 
     terrain::generate_terrain_vertices(map_width, map_height, patch_numbers, vertices,
-                                       1.0f / static_cast<float>(map_width + 2), 1.0f / static_cast<float>(map_height + 2));
+                                       1.0f / static_cast<float>(texture_width),
+                                       1.0f / static_cast<float>(texture_height));
 
     // configure the cube's VAO (and terrainVBO)
     unsigned int terrain_00 = terrain::create_terrain(vertices);
 
-    siv::PerlinNoise::seed_type seed = 123456u;
+    siv::PerlinNoise::seed_type seed = 68364u;
     siv::PerlinNoise perlin(seed);
 
-    std::vector<float> height_data_00((map_width + 2) * (map_height + 2));
-    std::vector<float> height_data_01((map_width + 2) * (map_height + 2));
+    std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> map_data;
 
-    float scale = 0.05f;
-    int layer_count = 5;
+    float scale = 0.002f;
+    int layer_count = 10;
     float lacunarity = 1.8f;
     float layer_lacunarity = 0.6f;
     float layer_amplitude = 0.5f;
 
-//    terrain::get_height_map(height_data, perlin, map_width, map_height,
-//                            scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude, 1.0f, 2.0f);
-    terrain::get_height_map(height_data_00, perlin, map_width + 2, map_height + 2,
-                            scale, layer_count, -100.0f, -100.0f);
-    terrain::get_height_map(height_data_01, perlin, map_width + 2, map_height + 2,
-                            scale, layer_count, -100.0f, -101.0f);
+    for (int x = -1; x <= 1; ++x) {
+        for (int y = -1; y <= 1; ++y) {
+            std::vector<float> height_data(texture_width * texture_height);
 
-    unsigned int height_map_id_00 = terrain::load_height_map(map_width + 2, map_height + 2, height_data_00);
-    unsigned int height_map_id_01 = terrain::load_height_map(map_width + 2, map_height + 2, height_data_01);
+//            terrain::get_height_map(height_data, perlin, texture_width, texture_height,
+//                                    scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude,
+//                                    static_cast<float>(x), static_cast<float>(y));
+
+            terrain::get_height_map(height_data, perlin, texture_width, texture_height,
+                                    scale, layer_count, static_cast<float>(x), static_cast<float>(y));
+
+            map_data.insert({std::pair<int, int>(x, y),
+                             terrain::map_chunk(x, y,
+                                                std::move(height_data),
+                                                terrain::load_height_map(
+                                                        texture_width, texture_height, height_data)
+                             )});
+        }
+    }
 
 //    std::cout << "Loaded " << patch_numbers * patch_numbers << " patches of 4 control points each" << std::endl;
 //    std::cout << "Processing " << patch_numbers * patch_numbers * 4 << " vertices in vertex shader" << std::endl;
@@ -98,17 +114,16 @@ int main() {
     shader_program_debug.set_int("height_map", 0);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, height_map_id_00);
 
-    float y_value = 0.1f;
-    float HEIGHT_SCALE = 0.1f; // may be 2.6 is best
+    float y_value = 0.009f;
+    float HEIGHT_SCALE = 0.1f;
     bool show_normal = false;
 
     // callback for im_gui
     std::function<void()> gui_config_callback = [&]() {
         ImGui::Text("time = %f", glfwGetTime());
         ImGui::SliderFloat("Y: ", &y_value, 0, 0.3f);
-        ImGui::SliderFloat("HEIGHT_SCALE: ", &HEIGHT_SCALE, 0.5f, 50.f);
+        ImGui::SliderFloat("HEIGHT_SCALE: ", &HEIGHT_SCALE, 0.0f, 1.0f);
         ImGui::Checkbox("Show Normal: ", &show_normal);
 
         ImGui::NewLine();
@@ -120,28 +135,30 @@ int main() {
 
         if (ImGui::Button("Generate Map")) {
 
-//            terrain::get_height_map(height_data, perlin, map_width, map_height,
-//                                    scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude, 1.0f, 2.0f);
+            for (auto &map: map_data) {
+//                terrain::get_height_map(map.second.height_data, perlin, map_width, map_height,
+//                                        scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude,
+//                                        static_cast<float >(map.second.grid_x), static_cast<float>(map.second.grid_y));
 
-            terrain::get_height_map(height_data_00, perlin, map_width + 2, map_height + 2,
-                                    scale, layer_count, -1.0f, 0.0f);
-            terrain::get_height_map(height_data_01, perlin, map_width + 2, map_height + 2,
-                                    scale, layer_count, -1.0f, -1.0f);
+                terrain::get_height_map(map.second.height_data, perlin, texture_width, texture_height,
+                                        scale, layer_count, static_cast<float >(map.second.grid_x),
+                                        static_cast<float>(map.second.grid_y));
 
-            glBindTexture(GL_TEXTURE_2D, height_map_id_00);
-            // to support non-power-of-two heightmap textures
-            glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+                glBindTexture(GL_TEXTURE_2D, map.second.height_map_id);
+                // to support non-power-of-two heightmap textures
+                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-            // use GL_RED format
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, map_width + 2, map_height + 2, 0, GL_RED, GL_FLOAT,
-                         height_data_00.data());
+                // use GL_RED format
+                glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texture_width, texture_height, 0, GL_RED, GL_FLOAT,
+                             map.second.height_data.data());
 
-            // generate mipmap for texture
-            glGenerateMipmap(GL_TEXTURE_2D);
+                // generate mipmap for texture
+                glGenerateMipmap(GL_TEXTURE_2D);
+            }
         }
     };
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+//    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
 
         utilities::config_im_gui_loop("Debug", gui_config_callback);
@@ -159,6 +176,9 @@ int main() {
         glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        // render the triangle
+        glBindVertexArray(terrain_00);
+
         glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 10000.0f);
 
         // camera/view transformation
@@ -167,61 +187,49 @@ int main() {
         // calculate the model matrix for each object and pass it to shader before drawing
         glm::mat4 model = glm::mat4(1.0f);
 
-        model = glm::translate(model, glm::vec3
-                (
-                        0 * map_width,
-                        0,
-                        0 * map_height
-                ));
-
         shader_program.use();
-        glBindTexture(GL_TEXTURE_2D, height_map_id_00);
         shader_program
                 .set_mat4("projection", projection)
-                .set_mat4("view", view)
-                .set_mat4("model", model);
+                .set_mat4("view", view);
 
-        // render the triangle
-        glBindVertexArray(terrain_00);
+        for (auto &map: map_data) {
+            glBindTexture(GL_TEXTURE_2D, map.second.height_map_id);
+            model = glm::mat4(1.0f);
+            model = glm::translate(model, glm::vec3
+                    (
+                            map.second.grid_x * map_width,
+                            0,
+                            map.second.grid_y * map_height
+                    ));
+            shader_program
+                    .set_mat4("model", model);
 
-        glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
-
-        glBindTexture(GL_TEXTURE_2D, height_map_id_01);
-        model = glm::mat4(1.0f);
-        model = glm::translate(model, glm::vec3
-                (
-                        0 * map_width,
-                        0,
-                        -1 * map_height
-                ));
-        shader_program
-                .set_mat4("model", model);
-
-        glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
-
-//        model = glm::mat4(1.0f);
-//        model = glm::translate(model, glm::vec3
-//                (
-//                        0 * map_width,
-//                        0,
-//                        2 * (map_height * 0.5f)
-//                ));
-//        shader_program
-//                .set_mat4("model", model);
-//        glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
-
-
+            glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+        }
 
         if (show_normal) {
             shader_program_debug.use();
             shader_program_debug
                     .set_mat4("projection", projection)
                     .set_mat4("view", view)
-                    .set_mat4("model", model)
                     .set_float("y_value", y_value)
                     .set_float("HEIGHT_SCALE", HEIGHT_SCALE);
 
-            glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+            // calculate the model matrix for each object and pass it to shader before drawing
+            for (auto &map: map_data) {
+                glBindTexture(GL_TEXTURE_2D, map.second.height_map_id);
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3
+                        (
+                                map.second.grid_x * map_width,
+                                0,
+                                map.second.grid_y * map_height
+                        ));
+                shader_program_debug
+                        .set_mat4("model", model);
+
+                glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+            }
         }
 
         utilities::render_im_gui();

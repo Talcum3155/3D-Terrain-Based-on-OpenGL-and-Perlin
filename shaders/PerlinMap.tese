@@ -31,7 +31,7 @@ void main() {
     // interpolate the real coordinates of texture along the v-axis
     vec2 tex_coord = (t1 - t0) * v + t0;
 
-    height = texture(height_map, tex_coord).x * 64.0f - 16.0f;
+    height = texture(height_map, tex_coord).x * 500.0f - 200.0f;
 
     // Retrieve the four model coordinates of corners of the panel
     vec4 p00 = gl_in[0].gl_Position;

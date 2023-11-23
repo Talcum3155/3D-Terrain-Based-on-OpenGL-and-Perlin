@@ -58,9 +58,8 @@ void calculate_normal_2(vec2 tex_coord) {
 
 void calculate_normal_3(vec2 tex_coord) {
 
-    float uTexelSize = 1.0 / 512.0;
-    float vTexelSize = 1.0 / 512.0;
-    float HEIGHT_SCALE = 0.5f;
+    float uTexelSize = 1.0 / 64.0;
+    float vTexelSize = 1.0 / 64.0;
 
     // Sample heights around the current texture coordinate
     float left = texture(height_map, tex_coord + vec2(-uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
@@ -94,7 +93,7 @@ void main() {
     // interpolate the real coordinates of texture along the v-axis
     vec2 tex_coord = (t1 - t0) * v + t0;
 
-    float height = texture(height_map, tex_coord).x * 200.0f - 80.0f;
+    float height = texture(height_map, tex_coord).x * 500.0f - 200.0f;
 
 //    calculate_normal_1(tex_coord);
     //    calculate_normal_2(tex_coord);
@@ -116,7 +115,7 @@ void main() {
     vec4 p0 = (p01 - p00) * u + p00;
     vec4 p1 = (p11 - p10) * u + p10;
     vec4 p_i = (p1 - p0) * v + p0;
-    vec4 p = p_i + vec4(0, height, 0, 1);
+    vec4 p = p_i + vec4(0, height, 0, 0);
 
     calculate_normal_3(tex_coord);
 
