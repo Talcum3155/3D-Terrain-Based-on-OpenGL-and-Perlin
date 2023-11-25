@@ -7,7 +7,10 @@ uniform mat4 model;
 uniform mat4 view;
 
 // the array size equals the number of vertices in the patch
+in vec2 tex_coord_h[];
 in vec2 tex_coord[];
+
+out vec2 texture_coord_h[];
 out vec2 texture_coord[];
 
 void main() {
@@ -15,6 +18,7 @@ void main() {
     // do not change the model coord of the vertex
     gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;
     // do not change the texture coord of the vertex
+    texture_coord_h[gl_InvocationID] = tex_coord_h[gl_InvocationID];
     texture_coord[gl_InvocationID] = tex_coord[gl_InvocationID];
 
     // invocation zero controls tessellation levels for the entire patch
@@ -43,13 +47,13 @@ void main() {
         float tessLevel2 = mix(MAX_TESS_LEVEL, MIN_TESS_LEVEL, min(distance01, distance11));
         float tessLevel3 = mix(MAX_TESS_LEVEL, MIN_TESS_LEVEL, min(distance11, distance10));
 
-        gl_TessLevelOuter[0] = 32;
-        gl_TessLevelOuter[1] = 32;
-        gl_TessLevelOuter[2] = 32;
-        gl_TessLevelOuter[3] = 32;
+        gl_TessLevelOuter[0] = 64;
+        gl_TessLevelOuter[1] = 64;
+        gl_TessLevelOuter[2] = 64;
+        gl_TessLevelOuter[3] = 64;
 
-        gl_TessLevelInner[0] = 32;
-        gl_TessLevelInner[1] = 32;
+        gl_TessLevelInner[0] = 64;
+        gl_TessLevelInner[1] = 64;
     }
 
 }

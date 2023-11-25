@@ -45,6 +45,8 @@ namespace terrain {
                 vertices.push_back(-map_height_f * 0.5f + z * height_offset_factor);
                 vertices.push_back(x * u_offset_factor + u_offset);
                 vertices.push_back(z * v_offset_factor + v_offset);
+                vertices.push_back(x * patch_reciprocal);
+                vertices.push_back(z * patch_reciprocal);
 
                 // coordinates of the right lower corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
@@ -52,6 +54,8 @@ namespace terrain {
                 vertices.push_back(-map_height_f * 0.5f + z * height_offset_factor);
                 vertices.push_back((x + 1) * u_offset_factor + u_offset);
                 vertices.push_back(z * v_offset_factor + v_offset);
+                vertices.push_back((x + 1) * patch_reciprocal);
+                vertices.push_back(z * patch_reciprocal);
 
                 // coordinates of the left upper corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + x * width_offset_factor);
@@ -59,6 +63,8 @@ namespace terrain {
                 vertices.push_back(-map_height_f * 0.5f + (z + 1) * height_offset_factor);
                 vertices.push_back(x * u_offset_factor + u_offset);
                 vertices.push_back((z + 1) * v_offset_factor + v_offset);
+                vertices.push_back(x * patch_reciprocal);
+                vertices.push_back((z + 1) * patch_reciprocal);
 
                 // coordinates of the right upper corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
@@ -66,6 +72,8 @@ namespace terrain {
                 vertices.push_back(-map_height_f * 0.5f + (z + 1) * height_offset_factor);
                 vertices.push_back((x + 1) * u_offset_factor + u_offset);
                 vertices.push_back((z + 1) * v_offset_factor + v_offset);
+                vertices.push_back((x + 1) * patch_reciprocal);
+                vertices.push_back((z + 1) * patch_reciprocal);
             }
         }
     }
@@ -219,11 +227,14 @@ namespace terrain {
                      GL_STATIC_DRAW);
 
         // position attribute
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 7 * sizeof(float), nullptr);
         glEnableVertexAttribArray(0);
-        // texCoord attribute
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) (sizeof(float) * 3));
+        // height texCoord attribute
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void *) (sizeof(float) * 3));
         glEnableVertexAttribArray(1);
+        // texture texCoord attribute
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void *) (sizeof(float) * 5));
+        glEnableVertexAttribArray(2);
 
         return terrain_vao;
     }

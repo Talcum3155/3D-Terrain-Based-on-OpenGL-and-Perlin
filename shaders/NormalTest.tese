@@ -16,6 +16,8 @@ out VS_OUT {
     vec3 normal;
 } vs_out;
 
+uniform float terrain_height;
+
 void calculate_normal_1(vec2 tex_coord) {
     float uTexelSize = 1.0 / 3500.0;
     float vTexelSize = 1.0 / 1700.0;
@@ -93,7 +95,7 @@ void main() {
     // interpolate the real coordinates of texture along the v-axis
     vec2 tex_coord = (t1 - t0) * v + t0;
 
-    float height = texture(height_map, tex_coord).x * 500.0f - 200.0f;
+    float height = texture(height_map, tex_coord).x * terrain_height - (terrain_height / 3.0f);
 
 //    calculate_normal_1(tex_coord);
     //    calculate_normal_2(tex_coord);
