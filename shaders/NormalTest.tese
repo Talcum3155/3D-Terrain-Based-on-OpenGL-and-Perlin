@@ -60,8 +60,8 @@ void calculate_normal_2(vec2 tex_coord) {
 
 void calculate_normal_3(vec2 tex_coord) {
 
-    float uTexelSize = 1.0 / 64.0;
-    float vTexelSize = 1.0 / 64.0;
+    float uTexelSize = 1.0 / 512.0;
+    float vTexelSize = 1.0 / 512.0;
 
     // Sample heights around the current texture coordinate
     float left = texture(height_map, tex_coord + vec2(-uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
@@ -71,9 +71,11 @@ void calculate_normal_3(vec2 tex_coord) {
 
     // Calculate normals by taking cross products and averaging
 
-    vs_out.normal = normalize(vec3(left - right, y_value, down - up));
+    vs_out.normal = normalize(vec3(left - right, 2.0 * uTexelSize, down - up));
     mat3 normalMatrix = transpose(inverse(mat3(view * model)));
     vs_out.normal = normalize(normalMatrix * vs_out.normal);
+
+    vs_out.normal = normalize(vec3(1,1,1));
 }
 
 void main() {

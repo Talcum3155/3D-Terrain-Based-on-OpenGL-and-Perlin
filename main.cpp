@@ -144,7 +144,7 @@ int main() {
 
     float ambient_strength = 0.1;
     float light_x = 1.0f;
-    float light_y = 100.0f;
+    float light_y = 600.0f;
     float light_z = 1.0f;
 
     // callback for im_gui
@@ -227,7 +227,9 @@ int main() {
                 .set_vec3("light.view_pos", cam.position)
                 .set_vec3("light.light_pos", glm::vec3(light_x, light_y, light_z))
                 .set_vec3("light.light_color", glm::vec3(1, 1, 1))
-                .set_float("light.ambient_strength", ambient_strength);
+                .set_float("light.ambient_strength", ambient_strength)
+                .set_float("y_value", y_value)
+                .set_float("HEIGHT_SCALE", HEIGHT_SCALE);;
 
         for (auto &map: map_data) {
             glActiveTexture(GL_TEXTURE0);
