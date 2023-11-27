@@ -4,7 +4,9 @@
 
 struct terrain_material {
     sampler2D diff[MAX_TEXTURES];
+    sampler2D norm[MAX_TEXTURES];
     sampler2D ao[MAX_TEXTURES];
+    sampler2D disp[MAX_TEXTURES];
     float height[MAX_TEXTURES + 1];
 };
 
@@ -18,12 +20,12 @@ struct light_data {
     float specular_pow;
 };
 
-struct texture_data {
+in texture_data {
     float lower_bound;
     float upper_bound;
-    int texture_upper_index;
-    int texture_lower_index;
-};
+    flat int texture_upper_index;
+    flat int texture_lower_index;
+} tex_data;
 
 in terrain_data {
     float height;
@@ -31,15 +33,20 @@ in terrain_data {
     vec2 tex_coord;
     vec3 frag_pos;
     vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
+    vec3 blended_normal;
 } data;
 
 uniform terrain_material material;
 uniform light_data light;
 uniform float terrain_height;
 
-out vec4 FragColor;
+uniform bool enable_light;
+uniform bool enable_texture;
+uniform bool enable_tangent;
 
-texture_data tex_data;
+out vec4 FragColor;
 
 vec3 blinn_phong_lighting(vec3 normal, vec3 diff, float ao) {
     // ambient
@@ -52,42 +59,15 @@ vec3 blinn_phong_lighting(vec3 normal, vec3 diff, float ao) {
 
     // specular
 
-
     return vec3(ambient + diffuse);
-}
-
-void get_tex_data() {
-    tex_data.texture_upper_index = 0;
-
-    for (int i = 0; i < MAX_TEXTURES + 1; i++) {
-        if (data.height_01 < material.height[i]) {
-            tex_data.texture_upper_index = i;
-            break;
-        }
-    }
-
-    tex_data.texture_upper_index = clamp(tex_data.texture_upper_index, 0, MAX_TEXTURES - 1);
-    tex_data.texture_lower_index = clamp(tex_data.texture_upper_index - 1, 0, MAX_TEXTURES - 1);
-
-    tex_data.lower_bound = material.height[tex_data.texture_lower_index];
-    tex_data.upper_bound = material.height[tex_data.texture_upper_index];
-
-    //    tex_data.texture_upper_index = 2;
-    //    tex_data.texture_lower_index = 2;
-    //    tex_data.lower_bound = 0.1f;
-    //    tex_data.upper_bound = 0.1f;
 }
 
 vec4 get_diff(vec2 tex) {
     // the percentage of the height value within the current height range.
     //    float percentage = (data.height_01 - lower_bound) / (upper_bound - lower_bound);
 
-    //    float texture_resolution = (upper_bound - lower_bound) * terrain_height;
-
     vec4 base_color = texture2D(material.diff[tex_data.texture_lower_index], tex);
-
     vec4 next_color = texture2D(material.diff[tex_data.texture_upper_index], tex);
-
     return mix(base_color, next_color, smoothstep(tex_data.lower_bound, tex_data.upper_bound, data.height_01));
 }
 
@@ -99,18 +79,31 @@ vec4 get_ao(vec2 tex) {
 
 void main()
 {
-    get_tex_data();
+    mat3 tbn = mat3(data.tangent, data.bitangent, data.normal);
 
-    //    FragColor = vec4(h, h, h, 1.0f);
-    FragColor = vec4(blinn_phong_lighting
-                     (data.normal,
-                      get_diff(data.tex_coord).xyz,
-                      get_ao(data.tex_coord).r
-                     ), 1);
+    vec3 color = vec3(data.height_01, data.height_01, data.height_01);
+    float ao = 1.0f;
+    vec3 tex_noraml = data.normal;
 
-    //    FragColor = vec4(blinn_phong_lighting
-    //                     (normalize(vec3(1,1,1)),
-    //                      vec3(1,1,1),
-    //                      1.0f
-    //                     ), 1);
+    if (enable_texture) {
+        color = get_diff(data.tex_coord).xyz;
+        ao = get_ao(data.tex_coord).r;
+    }
+
+    if (enable_tangent) {
+        tex_noraml = tbn * data.blended_normal;
+    }
+
+    if (enable_light) {
+
+        color = blinn_phong_lighting
+        (
+        // transform normal of normal map from tangent space to world space
+            tex_noraml,
+            color.xyz,
+            ao
+        );
+    }
+
+    FragColor = vec4(color, 1.0f);
 }

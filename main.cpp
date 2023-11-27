@@ -12,6 +12,15 @@ void load_material_texture(std::vector<unsigned int> &diff_texture);
 
 void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures);
 
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
+                           std::vector<unsigned int> &norm_textures);
+
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
+                           std::vector<unsigned int> &norm_textures, std::vector<unsigned int> &disp_texture);
+
+void load_material_texture_without_ao(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
+                                      std::vector<unsigned int> &disp_texture);
+
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
 
@@ -120,13 +129,18 @@ int main() {
     // load texture
     std::vector<unsigned int> diff_textures;
     std::vector<unsigned int> ao_textures;
-    load_material_texture(diff_textures, ao_textures);
+    std::vector<unsigned int> norm_texture;
+    std::vector<unsigned int> disp_texture;
+//    load_material_texture(diff_textures, ao_textures, norm_texture, disp_texture);
+    load_material_texture_without_ao(diff_textures, norm_texture, disp_texture);
 
     int texture_index = 1;
     shader_program.use();
 
     set_texture(diff_textures, texture_index, "diff", shader_program);
     set_texture(ao_textures, texture_index, "ao", shader_program);
+    set_texture(norm_texture, texture_index, "norm", shader_program);
+    set_texture(disp_texture, texture_index, "disp", shader_program);
 
 #pragma endregion set texture to shaders
 
@@ -138,9 +152,13 @@ int main() {
         shader_program.set_float(uniform_name, height[i]);
     }
 
-    float y_value = 0.015f;
+    float y_value = 0.007f;
     float HEIGHT_SCALE = 0.455f;
     bool show_normal = false;
+    bool enable_light = false;
+    bool enable_texture = false;
+    bool enable_tangent = false;
+    float DISP = 0.1f;
 
     float ambient_strength = 0.1;
     float light_x = 1.0f;
@@ -153,6 +171,9 @@ int main() {
         ImGui::SliderFloat("Y: ", &y_value, 0, 0.3f);
         ImGui::SliderFloat("HEIGHT_SCALE: ", &HEIGHT_SCALE, 0.0f, 1.0f);
         ImGui::Checkbox("Show Normal: ", &show_normal);
+        ImGui::Checkbox("Show Texture: ", &enable_texture);
+        ImGui::Checkbox("Show Lighting: ", &enable_light);
+        ImGui::Checkbox("Show Tangent: ", &enable_tangent);
 
         ImGui::NewLine();
         ImGui::InputFloat("scale: ", &scale, 0, 0.00005f, "%.6f");
@@ -165,6 +186,7 @@ int main() {
         ImGui::InputFloat("light_x: ", &light_x);
         ImGui::InputFloat("light_y: ", &light_y);
         ImGui::InputFloat("light_z: ", &light_z);
+        ImGui::SliderFloat("DISP: ", &DISP, 0.0f, 1.0f);
 
         if (ImGui::Button("Generate Map")) {
 
@@ -229,7 +251,11 @@ int main() {
                 .set_vec3("light.light_color", glm::vec3(1, 1, 1))
                 .set_float("light.ambient_strength", ambient_strength)
                 .set_float("y_value", y_value)
-                .set_float("HEIGHT_SCALE", HEIGHT_SCALE);;
+                .set_float("HEIGHT_SCALE", HEIGHT_SCALE)
+                .set_float("DISP", DISP)
+                .set_bool("enable_light", enable_light)
+                .set_bool("enable_texture", enable_texture)
+                .set_bool("enable_tangent", enable_tangent);
 
         for (auto &map: map_data) {
             glActiveTexture(GL_TEXTURE0);
@@ -308,6 +334,42 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     ao_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_ao_4k.png"));
+}
+
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
+                           std::vector<unsigned int> &norm_textures) {
+    load_material_texture(diff_texture, ao_textures);
+
+    norm_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_nor_gl_2k.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_nor_gl_2k.png"));
+    norm_textures.push_back(
+            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_nor_gl_2k.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_nor_gl_2k.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_nor_gl_4k.png"));
+}
+
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
+                           std::vector<unsigned int> &norm_textures, std::vector<unsigned int> &disp_texture) {
+    load_material_texture(diff_texture, ao_textures, norm_textures);
+
+    disp_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_disp_2k.png"));
+    disp_texture.push_back(
+            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_height_4k.png"));
+}
+
+void load_material_texture_without_ao(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
+                                      std::vector<unsigned int> &disp_texture) {
+    load_material_texture(diff_texture, norm_textures);
+
+    disp_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_disp_2k.png"));
+    disp_texture.push_back(
+            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_height_4k.png"));
 }
 
 void set_texture(std::vector<unsigned int> &textures, int &texture_index,

@@ -14,49 +14,12 @@ in vec2 texture_coord[];
 
 out VS_OUT {
     vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
+    mat3 tangent_space;
 } vs_out;
 
 uniform float terrain_height;
-
-void calculate_normal_1(vec2 tex_coord) {
-    float uTexelSize = 1.0 / 3500.0;
-    float vTexelSize = 1.0 / 1700.0;
-
-    float left = texture(height_map, tex_coord + vec2(-uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
-    float right = texture(height_map, tex_coord + vec2(uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
-    float up = texture(height_map, tex_coord + vec2(0.0, vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
-    float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
-    vs_out.normal = normalize(vec3(left - right, y_value, down - up));
-
-    //    mat3 normalMatrix = transpose(inverse(mat3(view * model)));
-    //    vs_out.normal = normalize(normalMatrix * vs_out.normal);
-}
-
-void calculate_normal_2(vec2 tex_coord) {
-    const vec2 size = vec2(2.0, 0.0);
-    const ivec3 off = ivec3(-1, 0, 1);
-
-    float heightScale = 1.0f;
-    float height = texture(height_map, tex_coord).r * heightScale;
-
-    float s11 = height;
-    float s01 = textureOffset(height_map, tex_coord, off.xy).r * heightScale;
-    float s21 = textureOffset(height_map, tex_coord, off.zy).r * heightScale;
-    float s10 = textureOffset(height_map, tex_coord, off.yx).r * heightScale;
-    float s12 = textureOffset(height_map, tex_coord, off.yz).r * heightScale;
-
-    vec3 va = normalize(vec3(size.xy, s21 - s01));
-    vec3 vb = normalize(vec3(size.yx, s12 - s10));
-
-    vec4 bump = vec4(cross(va, vb), s11);
-    bump += 1.0;
-    bump *= 0.5;
-
-    //    vs_out.normal = normalize(bump.rgb);
-
-    mat3 normalMatrix = mat3(view * model);
-    vs_out.normal = normalize(normalMatrix * vs_out.normal);
-}
 
 void calculate_normal_3(vec2 tex_coord) {
 
@@ -69,13 +32,47 @@ void calculate_normal_3(vec2 tex_coord) {
     float up = texture(height_map, tex_coord + vec2(0.0, vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
     float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
 
-    // Calculate normals by taking cross products and averaging
-
     vs_out.normal = normalize(vec3(left - right, 2.0 * uTexelSize, down - up));
+
     mat3 normalMatrix = transpose(inverse(mat3(view * model)));
     vs_out.normal = normalize(normalMatrix * vs_out.normal);
 
-    vs_out.normal = normalize(vec3(1,1,1));
+    if (abs(dot(vs_out.normal, vec3(0, 1, 0))) < 0.999) {
+        vs_out.tangent = normalize(cross(vs_out.normal, vec3(0, 1, 0)));
+    } else {
+        vs_out.tangent = normalize(cross(vs_out.normal, vec3(1, 0, 0)));
+    }
+
+    vs_out.bitangent = normalize(cross(vs_out.normal, vs_out.tangent));
+    vs_out.tangent_space = mat3(vs_out.tangent, vs_out.bitangent, vs_out.normal);
+
+    mat3 tbn = mat3(vs_out.tangent, vs_out.bitangent, vs_out.normal);
+//    vs_out.normal = tbn * vs_out.normal;
+}
+
+void calculate_tangent_martrix(vec2 uv) {
+    float epsilon = 1 / 512.0f;
+
+    float heightCenter = texture(height_map, uv).r;
+    float heightRight = texture(height_map, uv + vec2(epsilon, 0.0)).r;
+    float heightUp = texture(height_map, uv + vec2(0.0, epsilon)).r;
+
+    // 计算切线和副切线的梯度
+    vec3 tangent = normalize(vec3(1.0, 0.0, (heightRight - heightCenter) / epsilon));
+    vec3 bitangent = normalize(vec3(1.0, 0.0, (heightUp - heightCenter) / epsilon));
+
+    // 计算法线
+    vec3 normal = cross(tangent, bitangent);
+
+    // 正规化法线
+    normal = normalize(normal);
+
+    vs_out.normal = normal;
+    mat3 normalMatrix = transpose(inverse(mat3(view * model)));
+    vs_out.normal = normalize(normalMatrix * vs_out.normal);
+
+    // 构建切线空间矩阵
+    vs_out.tangent_space = mat3(tangent, bitangent, normal);
 }
 
 void main() {
@@ -99,7 +96,7 @@ void main() {
 
     float height = texture(height_map, tex_coord).x * terrain_height - (terrain_height / 3.0f);
 
-//    calculate_normal_1(tex_coord);
+    //    calculate_normal_1(tex_coord);
     //    calculate_normal_2(tex_coord);
 
     // Retrieve the four model coordinates of corners of the panel
@@ -122,6 +119,7 @@ void main() {
     vec4 p = p_i + vec4(0, height, 0, 0);
 
     calculate_normal_3(tex_coord);
+    //    calculate_tangent_martrix(tex_coord);
 
     // perform the MV (Model-View) transformation.
     gl_Position = view * model * p;

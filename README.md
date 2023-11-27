@@ -37,4 +37,7 @@
 1. Tessellation Chapter II: Rendering Terrain using Tessellation Shaders & Dynamic Levels of Detail： https://learnopengl.com/Guest-Articles/2021/Tessellation/Tessellation
 2. 第三十课 曲面细分： https://doc.yonyoucloud.com/doc/wiki/project/modern-opengl-tutorial/tutorial30.html
 3. Tessellation： https://www.khronos.org/opengl/wiki/Tessellation
-4. ✠OpenGL-12-曲面细分： https://blog.csdn.net/itzyjr/article/details/119178559
+4. OpenGL-12-曲面细分： https://blog.csdn.net/itzyjr/article/details/119178559
+
+#### normal
+1. Rendering 6 Bumpiness: https://catlikecoding.com/unity/tutorials/rendering/part-6/

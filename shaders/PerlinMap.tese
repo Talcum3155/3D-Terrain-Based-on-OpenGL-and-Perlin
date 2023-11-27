@@ -3,13 +3,33 @@
 // sepcify patch type, spacing tyep, winding order for the generated primitives
 layout (quads, fractional_odd_spacing, ccw) in;
 
+#define MAX_TEXTURES 5
+
 out terrain_data {
     float height; // real value of height
     float height_01; // height value range (0,1)
     vec2 tex_coord;
     vec3 frag_pos;
     vec3 normal;
+    vec3 tangent;
+    vec3 bitangent;
+    vec3 blended_normal;
 } data;
+
+out texture_data {
+    float lower_bound;
+    float upper_bound;
+    flat int texture_upper_index;
+    flat int texture_lower_index;
+} tex_data;
+
+struct terrain_material {
+    sampler2D diff[MAX_TEXTURES];
+    sampler2D norm[MAX_TEXTURES];
+    sampler2D ao[MAX_TEXTURES];
+    sampler2D disp[MAX_TEXTURES];
+    float height[MAX_TEXTURES + 1];
+};
 
 uniform sampler2D height_map;
 uniform mat4 model;
@@ -19,6 +39,9 @@ uniform mat4 projection;
 uniform float terrain_height;
 uniform float y_value;
 uniform float HEIGHT_SCALE;
+uniform float DISP;
+
+uniform terrain_material material;
 
 in vec2 texture_coord_h[];
 in vec2 texture_coord[];
@@ -43,14 +66,61 @@ void calculate_normal_3(vec2 tex_coord) {
     // Sample heights around the current texture coordinate
     float left = texture(height_map, tex_coord + vec2(-uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
     float right = texture(height_map, tex_coord + vec2(uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
+
     float up = texture(height_map, tex_coord + vec2(0.0, vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
     float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
 
-    // Calculate normals by taking cross products and averaging
+    // construct the normal directly based on the cross-product formula.
+    data.normal = normalize(vec3(left - right, 2 * uTexelSize, down - up));
 
-    data.normal = normalize(vec3(left - right, y_value, down - up));
     mat3 normalMatrix = transpose(inverse(mat3(view * model)));
     data.normal = normalize(normalMatrix * data.normal);
+
+    // may be change the order of cross
+    if (abs(dot(data.normal, vec3(0, 1, 0))) < 0.999) {
+        data.tangent = normalize(cross(data.normal, vec3(0, 1, 0)));
+    } else {
+        data.tangent = normalize(cross(data.normal, vec3(1, 0, 0)));
+    }
+
+    data.tangent = normalize(cross(vec3(0, 1, 0), data.normal));
+    data.bitangent = normalize(cross(data.normal, data.tangent));
+}
+
+void get_tex_data() {
+    tex_data.texture_upper_index = 0;
+
+    for (int i = 0; i < MAX_TEXTURES + 1; i++) {
+        if (data.height_01 < material.height[i]) {
+            tex_data.texture_upper_index = i;
+            break;
+        }
+    }
+
+    tex_data.texture_upper_index = clamp(tex_data.texture_upper_index, 0, MAX_TEXTURES - 1);
+    tex_data.texture_lower_index = clamp(tex_data.texture_upper_index - 1, 0, MAX_TEXTURES - 1);
+
+    tex_data.lower_bound = material.height[tex_data.texture_lower_index];
+    tex_data.upper_bound = material.height[tex_data.texture_upper_index];
+
+    //    tex_data.texture_upper_index = 2;
+    //    tex_data.texture_lower_index = 2;
+    //    tex_data.lower_bound = 0.1f;
+    //    tex_data.upper_bound = 0.1f;
+}
+
+vec3 get_normal(vec2 tex) {
+    vec4 base_normal = texture2D(material.norm[tex_data.texture_lower_index], tex) * 2 - 1;
+    vec4 next_normal = texture2D(material.norm[tex_data.texture_upper_index], tex) * 2 - 1;
+
+    // whiteout blending to compute normal
+    return vec3(base_normal.xy + next_normal.xy, base_normal .z * next_normal.z);
+}
+
+vec4 get_disp(vec2 tex) {
+    vec4 base_color = texture2D(material.disp[tex_data.texture_lower_index], tex);
+    vec4 next_color = texture2D(material.disp[tex_data.texture_upper_index], tex);
+    return mix(base_color, next_color, smoothstep(tex_data.lower_bound, tex_data.upper_bound, data.height_01));
 }
 
 void main() {
@@ -85,7 +155,10 @@ void main() {
     // -----------------------------------------------------
 
     calculate_normal_3(tex_coord_h);
-    //    calculate_normal_2(tex_coord_h);
+
+    get_tex_data();
+    data.blended_normal = normalize(get_normal(data.tex_coord));
+    p = p + vec4(data.blended_normal * DISP * get_disp(data.tex_coord).r, 0);
 
     // perform the MVP (Model-View-Projection) transformation.
     gl_Position = projection * view * model * p;
