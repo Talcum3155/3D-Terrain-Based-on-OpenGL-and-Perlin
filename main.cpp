@@ -32,7 +32,7 @@ const unsigned short NUM_PATCH_PTS = 4;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-const unsigned patch_numbers = 16;
+const unsigned patch_numbers = 4;
 
 const int map_width = 256;
 const int map_height = 256;
@@ -131,8 +131,7 @@ int main() {
     std::vector<unsigned int> ao_textures;
     std::vector<unsigned int> norm_texture;
     std::vector<unsigned int> disp_texture;
-//    load_material_texture(diff_textures, ao_textures, norm_texture, disp_texture);
-    load_material_texture_without_ao(diff_textures, norm_texture, disp_texture);
+    load_material_texture(diff_textures, ao_textures, norm_texture, disp_texture);
 
     int texture_index = 1;
     shader_program.use();
@@ -156,7 +155,7 @@ int main() {
     float HEIGHT_SCALE = 0.455f;
     bool show_normal = false;
     bool enable_light = false;
-    bool enable_texture = false;
+    bool enable_texture = true;
     bool enable_tangent = false;
     float DISP = 0.1f;
 
@@ -322,7 +321,7 @@ void load_material_texture(std::vector<unsigned int> &diff_textures) {
     diff_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_diff_2k.png"));
     diff_textures.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_diff_2k.png"));
     diff_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_diff_2k.png"));
-    diff_textures.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_diff_2k.png"));
+    diff_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_diff_2k.png"));
     diff_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_col_4k.png"));
 }
 
@@ -332,7 +331,7 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     ao_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_ao_2k.png"));
-    ao_textures.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_ao_2k.png"));
+    ao_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_ao_4k.png"));
 }
 
@@ -344,7 +343,7 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     norm_textures.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_nor_gl_2k.png"));
     norm_textures.push_back(
             utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_nor_gl_2k.png"));
-    norm_textures.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_nor_gl_2k.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_nor_gl_2k.png"));
     norm_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_nor_gl_4k.png"));
 }
 
@@ -356,19 +355,7 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     disp_texture.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_disp_2k.png"));
     disp_texture.push_back(
             utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_height_4k.png"));
-}
-
-void load_material_texture_without_ao(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
-                                      std::vector<unsigned int> &disp_texture) {
-    load_material_texture(diff_texture, norm_textures);
-
-    disp_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/leafy_grass/", "leafy_grass_disp_2k.png"));
-    disp_texture.push_back(
-            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/rocks_ground/", "rocks_ground_06_disp_2k.png"));
+    disp_texture.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_disp_2k.png"));
     disp_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_height_4k.png"));
 }
 

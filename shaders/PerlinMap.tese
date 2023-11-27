@@ -83,7 +83,6 @@ void calculate_normal_3(vec2 tex_coord) {
         data.tangent = normalize(cross(data.normal, vec3(1, 0, 0)));
     }
 
-    data.tangent = normalize(cross(vec3(0, 1, 0), data.normal));
     data.bitangent = normalize(cross(data.normal, data.tangent));
 }
 

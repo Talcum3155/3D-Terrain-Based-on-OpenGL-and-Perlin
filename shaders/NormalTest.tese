@@ -47,7 +47,7 @@ void calculate_normal_3(vec2 tex_coord) {
     vs_out.tangent_space = mat3(vs_out.tangent, vs_out.bitangent, vs_out.normal);
 
     mat3 tbn = mat3(vs_out.tangent, vs_out.bitangent, vs_out.normal);
-//    vs_out.normal = tbn * vs_out.normal;
+    //    vs_out.normal = tbn * vs_out.normal;
 }
 
 void calculate_tangent_martrix(vec2 uv) {

@@ -47,6 +47,8 @@ namespace terrain {
                 vertices.push_back(z * v_offset_factor + v_offset);
                 vertices.push_back(x * patch_reciprocal);
                 vertices.push_back(z * patch_reciprocal);
+//                vertices.push_back(0);
+//                vertices.push_back(0);
 
                 // coordinates of the right lower corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
@@ -56,6 +58,8 @@ namespace terrain {
                 vertices.push_back(z * v_offset_factor + v_offset);
                 vertices.push_back((x + 1) * patch_reciprocal);
                 vertices.push_back(z * patch_reciprocal);
+//                vertices.push_back(1);
+//                vertices.push_back(0);
 
                 // coordinates of the left upper corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + x * width_offset_factor);
@@ -65,6 +69,8 @@ namespace terrain {
                 vertices.push_back((z + 1) * v_offset_factor + v_offset);
                 vertices.push_back(x * patch_reciprocal);
                 vertices.push_back((z + 1) * patch_reciprocal);
+//                vertices.push_back(0);
+//                vertices.push_back(1);
 
                 // coordinates of the right upper corner of the panel
                 vertices.push_back(-map_width_f * 0.5f + (x + 1) * width_offset_factor);
@@ -74,6 +80,8 @@ namespace terrain {
                 vertices.push_back((z + 1) * v_offset_factor + v_offset);
                 vertices.push_back((x + 1) * patch_reciprocal);
                 vertices.push_back((z + 1) * patch_reciprocal);
+//                vertices.push_back(1);
+//                vertices.push_back(1);
             }
         }
     }
