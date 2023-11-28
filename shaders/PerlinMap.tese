@@ -48,6 +48,8 @@ float upper_bound;
 int texture_upper_index;
 int texture_lower_index;
 
+out vec3 weights;
+
 vec2 interpolate_tex_coord(float u, float v, vec2 t00, vec2 t01, vec2 t10, vec2 t11) {
 
     // bilinearly interpolate texture coodinate across patch
@@ -73,7 +75,7 @@ void calculate_normal(vec2 tex_coord) {
     float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
 
     // construct the normal directly based on the cross-product formula.
-    data.w_normal = normalize(vec3(left - right, y_value, down - up));
+    data.w_normal = normalize(vec3(left - right, uTexelSize, down - up));
 
     // transform normal from model space to world sapce
     mat3 normalMatrix = transpose(inverse(mat3(model)));
@@ -117,9 +119,28 @@ vec3 get_normal(vec2 tex) {
 }
 
 vec4 get_disp(vec2 tex) {
-    vec4 base_color = texture2D(material.disp[texture_lower_index], tex);
-    vec4 next_color = texture2D(material.disp[texture_upper_index], tex);
+    vec4 x_color = texture2D(material.disp[texture_lower_index], data.frag_pos.yz * material.triplanar_scale);
+    vec4 y_color = texture2D(material.disp[texture_lower_index], data.frag_pos.xz * material.triplanar_scale);
+    vec4 z_color = texture2D(material.disp[texture_lower_index], data.frag_pos.xy * material.triplanar_scale);
+
+    vec4 base_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
+
+    x_color = texture2D(material.disp[texture_upper_index], data.frag_pos.yz * material.triplanar_scale);
+    y_color = texture2D(material.disp[texture_upper_index], data.frag_pos.xz * material.triplanar_scale);
+    z_color = texture2D(material.disp[texture_upper_index], data.frag_pos.xy * material.triplanar_scale);
+
+    vec4 next_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
+
     return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01));
+}
+
+void compute_normal_weight() {
+    weights = abs(data.w_normal);
+    weights = vec3(pow(weights.x, material.triplanar_sharpness),
+                   pow(weights.y, material.triplanar_sharpness),
+                   pow(weights.z, material.triplanar_sharpness));
+
+    weights = weights / (weights.x + weights.y + weights.z);
 }
 
 void main() {
@@ -163,7 +184,9 @@ void main() {
 
     get_tex_data();
     data.blended_normal = get_normal(data.tex_coord);
-    p = p + vec4(data.blended_normal * DISP * get_disp(data.tex_coord).r, 0);
+//    p = p + vec4(data.blended_normal * DISP * get_disp(data.tex_coord).r, 0);
+
+    compute_normal_weight();
 
     // perform the MVP (Model-View-Projection) transformation.
     gl_Position = projection * view * model * p;

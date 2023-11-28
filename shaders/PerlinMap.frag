@@ -41,10 +41,11 @@ uniform light_data light;
 uniform bool enable_light;
 uniform bool enable_texture;
 uniform bool enable_tangent;
+uniform bool use_whiteout;
 
 out vec4 FragColor;
 
-vec3 weights;
+in vec3 weights;
 
 float lower_bound;
 float upper_bound;
@@ -74,10 +75,10 @@ vec4 get_diff(vec2 tex) {
     return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01));
 }
 
-vec4 get_ao(vec2 tex) {
+float get_ao(vec2 tex) {
     vec4 base_color = texture2D(material.ao[texture_lower_index], tex);
     vec4 next_color = texture2D(material.ao[texture_upper_index], tex);
-    return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01));
+    return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01)).r;
 }
 
 // triplanar to sample diff texture
@@ -97,30 +98,44 @@ vec4 get_diff_triplanar() {
     return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01));
 }
 
+float get_ao_triplanar(vec2 tex) {
+    vec4 x_color = texture2D(material.ao[texture_lower_index], data.frag_pos.yz * material.triplanar_scale);
+    vec4 y_color = texture2D(material.ao[texture_lower_index], data.frag_pos.xz * material.triplanar_scale);
+    vec4 z_color = texture2D(material.ao[texture_lower_index], data.frag_pos.xy * material.triplanar_scale);
+
+    vec4 base_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
+
+    x_color = texture2D(material.ao[texture_upper_index], data.frag_pos.yz * material.triplanar_scale);
+    y_color = texture2D(material.ao[texture_upper_index], data.frag_pos.xz * material.triplanar_scale);
+    z_color = texture2D(material.ao[texture_upper_index], data.frag_pos.xy * material.triplanar_scale);
+
+    vec4 next_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
+
+    return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01)).r;
+}
+
 // triplanar to sample normal texture
 vec4 get_normal_triplanar() {
     vec4 x_color = texture2D(material.norm[texture_lower_index], data.frag_pos.yz * material.triplanar_scale);
     vec4 y_color = texture2D(material.norm[texture_lower_index], data.frag_pos.xz * material.triplanar_scale);
     vec4 z_color = texture2D(material.norm[texture_lower_index], data.frag_pos.xy * material.triplanar_scale);
 
-    vec4 base_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
+    vec4 base_normal = (x_color * weights.x + y_color * weights.y + z_color * weights.z);
 
     x_color = texture2D(material.norm[texture_upper_index], data.frag_pos.yz * material.triplanar_scale);
     y_color = texture2D(material.norm[texture_upper_index], data.frag_pos.xz * material.triplanar_scale);
     z_color = texture2D(material.norm[texture_upper_index], data.frag_pos.xy * material.triplanar_scale);
 
-    vec4 next_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
+    vec4 next_normal = (x_color * weights.x + y_color * weights.y + z_color * weights.z);
 
-    return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01)) * 2 - 1;
-}
+    base_normal = base_normal * 2 - 1;
+    next_normal = next_normal * 2 - 1;
 
-void compute_normal_weight() {
-    weights = abs(data.w_normal);
-    weights = vec3(pow(weights.x, material.triplanar_sharpness),
-                   pow(weights.y, material.triplanar_sharpness),
-                   pow(weights.z, material.triplanar_sharpness));
+    if (use_whiteout) {
+        return vec4(normalize(vec3(base_normal.xy + next_normal.xy, base_normal.z * next_normal.z)), 1.0f);
+    }
 
-    weights = weights / (weights.x + weights.y + weights.z);
+    return normalize(base_normal + next_normal);
 }
 
 void get_tex_data() {
@@ -140,10 +155,19 @@ void get_tex_data() {
     upper_bound = material.height[texture_upper_index];
 }
 
+//void compute_normal_weight() {
+//    weights = abs(data.w_normal);
+//    weights = vec3(pow(weights.x, material.triplanar_sharpness),
+//                   pow(weights.y, material.triplanar_sharpness),
+//                   pow(weights.z, material.triplanar_sharpness));
+//
+//    weights = weights / (weights.x + weights.y + weights.z);
+//}
+
 void main()
 {
     get_tex_data();
-    compute_normal_weight();
+    //    compute_normal_weight();
 
     mat3 tbn = mat3(data.tangent, data.bitangent, data.w_normal);
 
@@ -154,7 +178,7 @@ void main()
     if (enable_texture) {
         //        color = get_diff(data.tex_coord).xyz;
         color = get_diff_triplanar().xyz;
-        ao = get_ao(data.tex_coord).r;
+        ao = get_ao_triplanar(data.tex_coord);
     }
 
     if (enable_tangent) {

@@ -30,11 +30,11 @@ void main() {
     GenerateLine(1, gs_in[1].normal); // second vertex normal
     GenerateLine(2, gs_in[2].normal); // third vertex normal
 
-    GenerateLine(0, gs_in[0].tangent);
-    GenerateLine(1, gs_in[1].tangent);
-    GenerateLine(2, gs_in[2].tangent);
-
-    GenerateLine(0, gs_in[0].bitangent);
-    GenerateLine(1, gs_in[1].bitangent);
-    GenerateLine(2, gs_in[2].bitangent);
+//    GenerateLine(0, gs_in[0].tangent);
+//    GenerateLine(1, gs_in[1].tangent);
+//    GenerateLine(2, gs_in[2].tangent);
+//
+//    GenerateLine(0, gs_in[0].bitangent);
+//    GenerateLine(1, gs_in[1].bitangent);
+//    GenerateLine(2, gs_in[2].bitangent);
 }
