@@ -23,8 +23,8 @@ uniform float terrain_height;
 
 void calculate_normal_3(vec2 tex_coord) {
 
-    float uTexelSize = 1.0 / 512.0;
-    float vTexelSize = 1.0 / 512.0;
+    float uTexelSize = 1.0 / 256.0;
+    float vTexelSize = 1.0 / 256.0;
 
     // Sample heights around the current texture coordinate
     float left = texture(height_map, tex_coord + vec2(-uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
@@ -32,7 +32,7 @@ void calculate_normal_3(vec2 tex_coord) {
     float up = texture(height_map, tex_coord + vec2(0.0, vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
     float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
 
-    vs_out.normal = normalize(vec3(left - right, 2.0 * uTexelSize, down - up));
+    vs_out.normal = normalize(vec3(left - right, y_value, down - up));
 
     mat3 normalMatrix = transpose(inverse(mat3(view * model)));
     vs_out.normal = normalize(normalMatrix * vs_out.normal);
@@ -48,31 +48,6 @@ void calculate_normal_3(vec2 tex_coord) {
 
     mat3 tbn = mat3(vs_out.tangent, vs_out.bitangent, vs_out.normal);
     //    vs_out.normal = tbn * vs_out.normal;
-}
-
-void calculate_tangent_martrix(vec2 uv) {
-    float epsilon = 1 / 512.0f;
-
-    float heightCenter = texture(height_map, uv).r;
-    float heightRight = texture(height_map, uv + vec2(epsilon, 0.0)).r;
-    float heightUp = texture(height_map, uv + vec2(0.0, epsilon)).r;
-
-    // 计算切线和副切线的梯度
-    vec3 tangent = normalize(vec3(1.0, 0.0, (heightRight - heightCenter) / epsilon));
-    vec3 bitangent = normalize(vec3(1.0, 0.0, (heightUp - heightCenter) / epsilon));
-
-    // 计算法线
-    vec3 normal = cross(tangent, bitangent);
-
-    // 正规化法线
-    normal = normalize(normal);
-
-    vs_out.normal = normal;
-    mat3 normalMatrix = transpose(inverse(mat3(view * model)));
-    vs_out.normal = normalize(normalMatrix * vs_out.normal);
-
-    // 构建切线空间矩阵
-    vs_out.tangent_space = mat3(tangent, bitangent, normal);
 }
 
 void main() {

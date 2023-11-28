@@ -39,5 +39,8 @@
 3. Tessellation： https://www.khronos.org/opengl/wiki/Tessellation
 4. OpenGL-12-曲面细分： https://blog.csdn.net/itzyjr/article/details/119178559
 
-#### normal
+#### Normal
 1. Rendering 6 Bumpiness: https://catlikecoding.com/unity/tutorials/rendering/part-6/
+
+### Triplanar
+1. 【图形学】法线映射中的三平面映射技术 https://www.jianshu.com/p/cb241e5a2718

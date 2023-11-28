@@ -18,9 +18,6 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
 void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
                            std::vector<unsigned int> &norm_textures, std::vector<unsigned int> &disp_texture);
 
-void load_material_texture_without_ao(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
-                                      std::vector<unsigned int> &disp_texture);
-
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
 
@@ -32,7 +29,7 @@ const unsigned short NUM_PATCH_PTS = 4;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-const unsigned patch_numbers = 4;
+const unsigned patch_numbers = 16;
 
 const int map_width = 256;
 const int map_height = 256;
@@ -119,10 +116,10 @@ int main() {
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
 
     shader_program.use();
-    shader_program.set_int("height_map", 0).set_float("terrain_height", 500.0f);
+    shader_program.set_int("height_map", 0).set_float("terrain_height", 800.0f);
 
     shader_program_debug.use();
-    shader_program_debug.set_int("height_map", 0).set_float("terrain_height", 500.0f);
+    shader_program_debug.set_int("height_map", 0).set_float("terrain_height", 800.0f);
 
 #pragma set texture to shader
 
@@ -151,13 +148,16 @@ int main() {
         shader_program.set_float(uniform_name, height[i]);
     }
 
-    float y_value = 0.007f;
-    float HEIGHT_SCALE = 0.455f;
+    float y_value = 0.003684f;
+    float HEIGHT_SCALE = 0.358f;
     bool show_normal = false;
     bool enable_light = false;
     bool enable_texture = true;
     bool enable_tangent = false;
     float DISP = 0.1f;
+
+    float triplanar_scale = 0.51;
+    int triplanar_sharpness = 8;
 
     float ambient_strength = 0.1;
     float light_x = 1.0f;
@@ -167,12 +167,12 @@ int main() {
     // callback for im_gui
     std::function<void()> gui_config_callback = [&]() {
         ImGui::Text("time = %f", glfwGetTime());
-        ImGui::SliderFloat("Y: ", &y_value, 0, 0.3f);
+        ImGui::SliderFloat("Y: ", &y_value, 0, 0.1f,"%.6f");
         ImGui::SliderFloat("HEIGHT_SCALE: ", &HEIGHT_SCALE, 0.0f, 1.0f);
         ImGui::Checkbox("Show Normal: ", &show_normal);
         ImGui::Checkbox("Show Texture: ", &enable_texture);
         ImGui::Checkbox("Show Lighting: ", &enable_light);
-        ImGui::Checkbox("Show Tangent: ", &enable_tangent);
+        ImGui::Checkbox("Enable Tangent: ", &enable_tangent);
 
         ImGui::NewLine();
         ImGui::InputFloat("scale: ", &scale, 0, 0.00005f, "%.6f");
@@ -186,6 +186,9 @@ int main() {
         ImGui::InputFloat("light_y: ", &light_y);
         ImGui::InputFloat("light_z: ", &light_z);
         ImGui::SliderFloat("DISP: ", &DISP, 0.0f, 1.0f);
+
+        ImGui::SliderFloat("tri_scale: ", &triplanar_scale, 0.0f, 0.1f);
+        ImGui::SliderInt("tri_sharpness: ", &triplanar_sharpness, 1, 8);
 
         if (ImGui::Button("Generate Map")) {
 
@@ -252,6 +255,8 @@ int main() {
                 .set_float("y_value", y_value)
                 .set_float("HEIGHT_SCALE", HEIGHT_SCALE)
                 .set_float("DISP", DISP)
+                .set_float("material.triplanar_scale", triplanar_scale)
+                .set_int("material.triplanar_sharpness", triplanar_sharpness)
                 .set_bool("enable_light", enable_light)
                 .set_bool("enable_texture", enable_texture)
                 .set_bool("enable_tangent", enable_tangent);

@@ -6,6 +6,7 @@ layout (line_strip, max_vertices = 18) out;
 const float MAGNITUDE = 2.0f;
 
 uniform mat4 projection;
+uniform mat4 view;
 
 in VS_OUT {
     vec3 normal;
