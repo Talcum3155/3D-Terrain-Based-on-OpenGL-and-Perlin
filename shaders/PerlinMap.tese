@@ -17,13 +17,6 @@ out terrain_data {
     vec3 blended_normal;
 } data;
 
-out texture_data {
-    float lower_bound;
-    float upper_bound;
-    flat int texture_upper_index;
-    flat int texture_lower_index;
-} tex_data;
-
 struct terrain_material {
     sampler2D diff[MAX_TEXTURES];
     sampler2D norm[MAX_TEXTURES];
@@ -49,6 +42,11 @@ uniform terrain_material material;
 
 in vec2 texture_coord_h[];
 in vec2 texture_coord[];
+
+float lower_bound;
+float upper_bound;
+int texture_upper_index;
+int texture_lower_index;
 
 vec2 interpolate_tex_coord(float u, float v, vec2 t00, vec2 t01, vec2 t10, vec2 t11) {
 
@@ -92,41 +90,36 @@ void calculate_normal(vec2 tex_coord) {
 }
 
 void get_tex_data() {
-    tex_data.texture_upper_index = 0;
+    texture_upper_index = 0;
 
     for (int i = 0; i < MAX_TEXTURES + 1; i++) {
         if (data.height_01 < material.height[i]) {
-            tex_data.texture_upper_index = i;
+            texture_upper_index = i;
             break;
         }
     }
 
-    tex_data.texture_upper_index = clamp(tex_data.texture_upper_index, 0, MAX_TEXTURES - 1);
-    tex_data.texture_lower_index = clamp(tex_data.texture_upper_index - 1, 0, MAX_TEXTURES - 1);
+    texture_upper_index = clamp(texture_upper_index, 0, MAX_TEXTURES - 1);
+    texture_lower_index = clamp(texture_upper_index - 1, 0, MAX_TEXTURES - 1);
 
-    tex_data.lower_bound = material.height[tex_data.texture_lower_index];
-    tex_data.upper_bound = material.height[tex_data.texture_upper_index];
-
-    //    tex_data.texture_upper_index = 2;
-    //    tex_data.texture_lower_index = 2;
-    //    tex_data.lower_bound = 0.1f;
-    //    tex_data.upper_bound = 0.1f;
+    lower_bound = material.height[texture_lower_index];
+    upper_bound = material.height[texture_upper_index];
 }
 
 vec3 get_normal(vec2 tex) {
-    return texture2D(material.norm[tex_data.texture_lower_index], tex).xyz * 2 - 1;
+    return texture2D(material.norm[texture_lower_index], tex).xyz * 2 - 1;
 
-    vec3 base_normal = texture2D(material.norm[tex_data.texture_lower_index], tex).xyz * 2 - 1;
-    vec3 next_normal = texture2D(material.norm[tex_data.texture_upper_index], tex).xyz * 2 - 1;
+    vec3 base_normal = texture2D(material.norm[texture_lower_index], tex).xyz * 2 - 1;
+    vec3 next_normal = texture2D(material.norm[texture_upper_index], tex).xyz * 2 - 1;
 
     // whiteout blending to compute normal
     return normalize(vec3(base_normal.xy + next_normal.xy, base_normal.z * next_normal.z));
 }
 
 vec4 get_disp(vec2 tex) {
-    vec4 base_color = texture2D(material.disp[tex_data.texture_lower_index], tex);
-    vec4 next_color = texture2D(material.disp[tex_data.texture_upper_index], tex);
-    return mix(base_color, next_color, smoothstep(tex_data.lower_bound, tex_data.upper_bound, data.height_01));
+    vec4 base_color = texture2D(material.disp[texture_lower_index], tex);
+    vec4 next_color = texture2D(material.disp[texture_upper_index], tex);
+    return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01));
 }
 
 void main() {
