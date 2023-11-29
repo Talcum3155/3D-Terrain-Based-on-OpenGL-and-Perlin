@@ -43,16 +43,28 @@ namespace utilities {
     scroll_callback(GLFWwindow *window, double, double y_offset, camera &cam);
 
     unsigned int
-    load_texture(std::string &&absolute_path, std::string &&texture_name);
+    load_texture(std::string &&absolute_path, std::string &&texture_name, bool hdr = false,
+                 const char32_t &texture_wrap = GL_REPEAT);
 
     unsigned int
-    load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height);
+    load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height,
+                 const char32_t &texture_wrap = GL_REPEAT);
+
+    unsigned int
+    load_texture_hdr(std::string &&absolute_path, std::string &&texture_name, int &width, int &height,
+                     const char32_t &texture_wrap = GL_CLAMP_TO_EDGE);
+
+    unsigned int
+    load_cube_map(std::vector<std::string> &map_path);
+
+    std::tuple<unsigned int, unsigned int, unsigned int>
+    load_cube_map_spherical(const int &map_width, const int &map_height);
 
     void
     create_im_gui_context(GLFWwindow *window, std::string &&glsl_version);
 
     void
-    config_im_gui_loop(const char* gui_name, void_callback &callback);
+    config_im_gui_loop(const char *gui_name, void_callback &callback);
 
     void
     render_im_gui();

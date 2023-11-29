@@ -212,15 +212,22 @@ namespace utilities {
      * @return texture id
      */
     unsigned int
-    load_texture(std::string &&absolute_path, std::string &&texture_name) {
+    load_texture(std::string &&absolute_path, std::string &&texture_name,
+                 bool hdr, const char32_t &texture_wrap) {
         int dummy_width, dummy_height;
-        return load_texture(std::forward<std::string>(absolute_path),
+        return hdr ?
+               load_texture_hdr(std::forward<std::string>(absolute_path),
+                                std::forward<std::string>(texture_name),
+                                dummy_width, dummy_height, texture_wrap)
+                   :
+               load_texture(std::forward<std::string>(absolute_path),
                             std::forward<std::string>(texture_name),
-                            dummy_width, dummy_height); // discard height and width
+                            dummy_width, dummy_height, texture_wrap); // discard height and width
     }
 
     unsigned int
-    load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height) {
+    load_texture(std::string &&absolute_path, std::string &&texture_name, int &width, int &height,
+                 const char32_t &texture_wrap) {
         unsigned int texture_id;
         glGenTextures(1, &texture_id);
         glBindTexture(GL_TEXTURE_2D, texture_id);
@@ -248,8 +255,8 @@ namespace utilities {
             glGenerateMipmap(GL_TEXTURE_2D);
 
             // set texture wrapping
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-//            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, static_cast<GLint>(texture_wrap));
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, static_cast<GLint>(texture_wrap));
             // set texture filtering
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -263,6 +270,93 @@ namespace utilities {
 
         glBindTexture(GL_TEXTURE_2D, 0);
         return texture_id;
+    }
+
+    unsigned int
+    load_texture_hdr(std::string &&absolute_path, std::string &&texture_name, int &width, int &height,
+                     const char32_t &texture_wrap) {
+        int nr_components;
+        float *data = stbi_loadf(std::string(absolute_path + texture_name).c_str(),
+                                 &width, &height, &nr_components, 0);
+        unsigned int hdr_texture;
+        if (data) {
+            glGenTextures(1, &hdr_texture);
+            glBindTexture(GL_TEXTURE_2D, hdr_texture);
+
+            // note how specify the texture's data value to be float
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT,
+                         data);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+            stbi_image_free(data);
+        } else {
+            std::cout << "Failed to load HDR image." << std::endl;
+        }
+
+        return hdr_texture;
+    }
+
+    unsigned int
+    load_cube_map(std::vector<std::string> &map_path) {
+        unsigned int textureID;
+        glGenTextures(1, &textureID);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+
+        int width, height, nrChannels;
+
+        for (unsigned int i = 0; i < map_path.size(); i++) {
+            unsigned char *data = stbi_load(map_path[i].c_str(), &width, &height, &nrChannels, 0);
+            if (data) {
+                glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,
+                             0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data
+                );
+                stbi_image_free(data);
+            } else {
+                std::cout << "Cube Map texture failed to load at path: " << map_path[i] << std::endl;
+                stbi_image_free(data);
+            }
+        }
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+        return textureID;
+    }
+
+    std::tuple<unsigned int, unsigned int, unsigned int>
+    load_cube_map_spherical(const int &map_width, const int &map_height) {
+        unsigned int capture_fbo, capture_rbo;
+        glGenFramebuffers(1, &capture_fbo);
+        glGenFramebuffers(1, &capture_rbo);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+        glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, map_width, map_height);
+        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
+
+        unsigned int cube_map;
+        glGenTextures(1, &cube_map);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, cube_map);
+
+        for (int i = 0; i < 6; ++i) {
+            // note that store each face with 16 bit floating point values
+            glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+                         map_width, map_height, 0, GL_RGB, GL_FLOAT, nullptr);
+        }
+
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        return {capture_rbo, capture_fbo, cube_map};
     }
 
     void
@@ -297,7 +391,7 @@ namespace utilities {
     }
 
     void
-    render_im_gui(){
+    render_im_gui() {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
     }

@@ -220,7 +220,7 @@ namespace terrain {
         return static_cast<float>((value > 0.0f)) - static_cast<float>(value < 0.0f);
     }
 
-    unsigned int
+    std::tuple<unsigned int, unsigned int>
     create_terrain(std::vector<float> &vertices) {
         if (vertices.empty())
             throw std::runtime_error("vertices vector is empty!!!");
@@ -244,6 +244,6 @@ namespace terrain {
         glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 7 * sizeof(float), (void *) (sizeof(float) * 5));
         glEnableVertexAttribArray(2);
 
-        return terrain_vao;
+        return {terrain_vao, terrain_vbo};
     }
 }

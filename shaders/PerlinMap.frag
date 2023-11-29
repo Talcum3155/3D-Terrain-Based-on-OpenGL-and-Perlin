@@ -38,6 +38,8 @@ in terrain_data {
 uniform terrain_material material;
 uniform light_data light;
 
+uniform vec3 local_pos;
+
 uniform bool enable_light;
 uniform bool enable_texture;
 uniform bool enable_tangent;
@@ -163,6 +165,7 @@ void get_tex_data() {
 //
 //    weights = weights / (weights.x + weights.y + weights.z);
 //}
+
 
 void main()
 {

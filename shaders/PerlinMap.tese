@@ -37,6 +37,7 @@ uniform float terrain_height;
 uniform float y_value;
 uniform float HEIGHT_SCALE;
 uniform float DISP;
+uniform bool use_whiteout;
 
 uniform terrain_material material;
 
@@ -83,9 +84,9 @@ void calculate_normal(vec2 tex_coord) {
 
     // may be change the order of cross
     if (abs(dot(data.w_normal, vec3(0, 1, 0))) < 0.999) {
-        data.tangent = normalize(cross(data.w_normal, vec3(0, 1, 0)));
+        data.tangent = normalize(cross(vec3(0, 1, 0),data.w_normal));
     } else {
-        data.tangent = normalize(cross(data.w_normal, vec3(1, 0, 0)));
+        data.tangent = normalize(cross(vec3(1, 0, 0),data.w_normal));
     }
 
     data.bitangent = normalize(cross(data.w_normal, data.tangent));
@@ -108,14 +109,27 @@ void get_tex_data() {
     upper_bound = material.height[texture_upper_index];
 }
 
-vec3 get_normal(vec2 tex) {
-    return texture2D(material.norm[texture_lower_index], tex).xyz * 2 - 1;
+vec4 get_normal(vec2 tex) {
+    vec4 x_color = texture2D(material.norm[texture_lower_index], data.frag_pos.yz * material.triplanar_scale);
+    vec4 y_color = texture2D(material.norm[texture_lower_index], data.frag_pos.xz * material.triplanar_scale);
+    vec4 z_color = texture2D(material.norm[texture_lower_index], data.frag_pos.xy * material.triplanar_scale);
 
-    vec3 base_normal = texture2D(material.norm[texture_lower_index], tex).xyz * 2 - 1;
-    vec3 next_normal = texture2D(material.norm[texture_upper_index], tex).xyz * 2 - 1;
+    vec4 base_normal = (x_color * weights.x + y_color * weights.y + z_color * weights.z);
 
-    // whiteout blending to compute normal
-    return normalize(vec3(base_normal.xy + next_normal.xy, base_normal.z * next_normal.z));
+    x_color = texture2D(material.norm[texture_upper_index], data.frag_pos.yz * material.triplanar_scale);
+    y_color = texture2D(material.norm[texture_upper_index], data.frag_pos.xz * material.triplanar_scale);
+    z_color = texture2D(material.norm[texture_upper_index], data.frag_pos.xy * material.triplanar_scale);
+
+    vec4 next_normal = (x_color * weights.x + y_color * weights.y + z_color * weights.z);
+
+    base_normal = base_normal * 2 - 1;
+    next_normal = next_normal * 2 - 1;
+
+    if (use_whiteout) {
+        return vec4(normalize(vec3(base_normal.xy + next_normal.xy, base_normal.z * next_normal.z)), 1.0f);
+    }
+
+    return normalize(base_normal + next_normal);
 }
 
 vec4 get_disp(vec2 tex) {
@@ -183,8 +197,8 @@ void main() {
     calculate_normal(tex_coord_h);
 
     get_tex_data();
-    data.blended_normal = get_normal(data.tex_coord);
-//    p = p + vec4(data.blended_normal * DISP * get_disp(data.tex_coord).r, 0);
+//    data.blended_normal = get_normal(data.tex_coord).xyz;
+//    p = p + vec4(data.w_normal * DISP * get_disp(data.tex_coord).r, 0);
 
     compute_normal_weight();
 

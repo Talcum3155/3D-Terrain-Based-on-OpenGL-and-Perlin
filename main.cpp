@@ -21,6 +21,8 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
 
+void render_cube();
+
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
 const unsigned short NUM_PATCH_PTS = 4;
@@ -29,6 +31,8 @@ const unsigned short NUM_PATCH_PTS = 4;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
+const int cube_map_resolution = 1080;
+
 const unsigned patch_numbers = 16;
 
 const int map_width = 256;
@@ -36,6 +40,8 @@ const int map_height = 256;
 
 const int texture_width = map_width + 2;
 const int texture_height = map_height + 2;
+
+const int terrain_height = 600;
 
 const int render_distance = 3;
 
@@ -54,6 +60,10 @@ int main() {
         return -1;
     }
 
+    glEnable(GL_DEPTH_TEST);
+    // set depth function to less than AND equal for skybox depth trick.
+    glDepthFunc(GL_LEQUAL);
+
     utilities::create_im_gui_context(window, "#version 460");
 
     GLint maxTessLevel;
@@ -71,6 +81,15 @@ int main() {
                                                std::string("NormalTest.frag"), std::string("NormalTest.tesc"),
                                                std::string("NormalTest.tese"), std::string("NormalTest.geom"));
 
+    utilities::shader cube_map_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
+                                      std::string("CubeMap.frag"));
+
+    utilities::shader background_shader(std::string("../shaders/"), std::string("BackGround.vert"),
+                                        std::string("BackGround.frag"));
+
+    background_shader.use();
+    background_shader.set_int("environment_map", 0);
+
     std::vector<float> vertices;
 
     // generate a plane to tessellation
@@ -79,14 +98,14 @@ int main() {
                                        1.0f / static_cast<float>(texture_height));
 
     // configure the cube's VAO (and terrainVBO)
-    unsigned int terrain_vao = terrain::create_terrain(vertices);
+    auto [terrain_vao, terrain_vbo] = terrain::create_terrain(vertices);
 
     siv::PerlinNoise::seed_type seed(683647643u);
     siv::PerlinNoise perlin(seed);
 
     std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> map_data;
 
-    float scale = 0.0014f;
+    float scale = 0.002f;
     int layer_count = 10;
     float lacunarity = 1.8f;
     float layer_lacunarity = 0.6f;
@@ -116,10 +135,100 @@ int main() {
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
 
     shader_program.use();
-    shader_program.set_int("height_map", 0).set_float("terrain_height", 600.0f);
+    shader_program.set_int("height_map", 0).set_float("terrain_height", terrain_height);
 
     shader_program_debug.use();
-    shader_program_debug.set_int("height_map", 0).set_float("terrain_height", 600.0f);
+    shader_program_debug.set_int("height_map", 0).set_float("terrain_height", terrain_height);
+
+#pragma sky box
+
+    // set framebuffer and renderbuffer for rending sky box
+    unsigned int capture_fbo, capture_rbo;
+    // generate framebuffer and renderbuffer
+    glGenFramebuffers(1, &capture_fbo);
+    glGenRenderbuffers(1, &capture_rbo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+
+    // set render buffer as depth attachment
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_resolution, cube_map_resolution);
+    // bind depth attachment for framebuffer
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
+
+    // load hdr texture
+    stbi_set_flip_vertically_on_load(true);
+    unsigned int hdr_texture = utilities::load_texture(std::string("../assets/images/"),
+                                                       std::string("farm_field_puresky_4k.hdr"), true);
+
+    // generate a empty texture as sky box
+    unsigned int env_cube_map;
+    glGenTextures(1, &env_cube_map);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map);
+
+    // bind every face of texture for cube map
+    for (int i = 0; i < 6; ++i) {
+        // note that store each face with 16 bit floating point values
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+                     cube_map_resolution, cube_map_resolution, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // fov 90 to capture all scene
+    glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    // the view matrix of every faces
+    glm::mat4 capture_views[] =
+            {
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+                                glm::vec3(0.0f, 0.0f, 1.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f),
+                                glm::vec3(0.0f, 0.0f, -1.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f))
+            };
+
+    // convert HDR equirectangular environment map to cube map equivalent
+    cube_map_shader.use();
+    cube_map_shader
+            .set_int("equirectangular_map", 0)
+            .set_mat4("projection", capture_projection);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdr_texture);
+
+    // configure the viewport to the capture dimensions.
+    glViewport(0, 0, cube_map_resolution, cube_map_resolution);
+
+    // render sky box to framer buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    for (int i = 0; i < 6; ++i) {
+        cube_map_shader.set_mat4("view", capture_views[i]);
+
+        // set cube map texture as texture attachment
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, env_cube_map, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        render_cube();
+    }
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+#pragma endregion sky box
+
 
 #pragma set texture to shader
 
@@ -127,8 +236,8 @@ int main() {
     std::vector<unsigned int> diff_textures;
     std::vector<unsigned int> ao_textures;
     std::vector<unsigned int> norm_texture;
-    std::vector<unsigned int> disp_texture;
-    load_material_texture(diff_textures, ao_textures, norm_texture, disp_texture);
+//    std::vector<unsigned int> disp_texture;
+    load_material_texture(diff_textures, ao_textures, norm_texture);
 
     int texture_index = 1;
     shader_program.use();
@@ -136,7 +245,7 @@ int main() {
     set_texture(diff_textures, texture_index, "diff", shader_program);
     set_texture(ao_textures, texture_index, "ao", shader_program);
     set_texture(norm_texture, texture_index, "norm", shader_program);
-    set_texture(disp_texture, texture_index, "disp", shader_program);
+//    set_texture(disp_texture, texture_index, "disp", shader_program);
 
 #pragma endregion set texture to shaders
 
@@ -157,7 +266,7 @@ int main() {
     bool use_whiteout = false;
     float DISP = 0.1f;
 
-    float triplanar_scale = 0.02;
+    float triplanar_scale = 0.08;
     int triplanar_sharpness = 8;
 
     float ambient_strength = 0.1;
@@ -217,6 +326,7 @@ int main() {
         }
     };
 
+    glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
 
@@ -224,7 +334,7 @@ int main() {
 
         // per-frame time logic
         // --------------------
-        float currentFrame = static_cast<float>(glfwGetTime());
+        auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
 
@@ -305,6 +415,16 @@ int main() {
             }
         }
 
+        // render skybox (render as last to prevent overdraw)
+        background_shader.use();
+        background_shader
+                .set_mat4("projection", projection)
+                .set_mat4("view", view);
+        // bind texture0 to cube map
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map);
+        render_cube();
+
         utilities::render_im_gui();
 
         // swap the color buffer
@@ -314,7 +434,7 @@ int main() {
     }
 
     glDeleteVertexArrays(1, &terrain_vao);
-//    glDeleteBuffers(1, &terrainVBO);
+    glDeleteBuffers(1, &terrain_vbo);
     glDeleteProgram(shader_program.id);
 
     ImGui_ImplOpenGL3_Shutdown();
@@ -327,7 +447,8 @@ int main() {
 
 void load_material_texture(std::vector<unsigned int> &diff_textures) {
     diff_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_diff_2k.png"));
-    diff_textures.push_back(utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_diff_2k.png"));
+    diff_textures.push_back(
+            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_diff_2k.png"));
     diff_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_diff_2k.png"));
     diff_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_diff_2k.png"));
     diff_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_col_4k.png"));
@@ -337,7 +458,8 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     load_material_texture(diff_texture);
 
     ao_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_ao_2k.png"));
-    ao_textures.push_back(utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_ao_2k.png"));
+    ao_textures.push_back(
+            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_ao_2k.png"));
     ao_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_ao_4k.png"));
@@ -348,7 +470,8 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     load_material_texture(diff_texture, ao_textures);
 
     norm_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_nor_gl_2k.png"));
-    norm_textures.push_back(utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_nor_gl_2k.png"));
+    norm_textures.push_back(
+            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_nor_gl_2k.png"));
     norm_textures.push_back(
             utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_nor_gl_2k.png"));
     norm_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_nor_gl_2k.png"));
@@ -360,7 +483,8 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     load_material_texture(diff_texture, ao_textures, norm_textures);
 
     disp_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_disp_2k.png"));
+    disp_texture.push_back(
+            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_disp_2k.png"));
     disp_texture.push_back(
             utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_disp_2k.png"));
     disp_texture.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_disp_2k.png"));
@@ -377,4 +501,81 @@ void set_texture(std::vector<unsigned int> &textures, int &texture_index,
         shader_program.set_int(uniform_name, texture_index);
         texture_index++;
     }
+}
+
+void render_cube() {
+    static unsigned int cube_vao;
+    static unsigned int cube_vbo;
+
+    // initialize (if necessary)
+    if (cube_vao == 0) {
+        float vertices[] = {
+                // back face
+                -1.0f, -1.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+                1.0f, 1.0f, -1.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, // top-right
+                1.0f, -1.0f, -1.0f, 0.0f, 0.0f, -1.0f, 1.0f, 0.0f, // bottom-right
+                1.0f, 1.0f, -1.0f, 0.0f, 0.0f, -1.0f, 1.0f, 1.0f, // top-right
+                -1.0f, -1.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
+                -1.0f, 1.0f, -1.0f, 0.0f, 0.0f, -1.0f, 0.0f, 1.0f, // top-left
+                // front face
+                -1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom-left
+                1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 0.0f, // bottom-right
+                1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, // top-right
+                1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, // top-right
+                -1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 1.0f, // top-left
+                -1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, // bottom-left
+                // left face
+                -1.0f, 1.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // top-right
+                -1.0f, 1.0f, -1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, // top-left
+                -1.0f, -1.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom-left
+                -1.0f, -1.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom-left
+                -1.0f, -1.0f, 1.0f, -1.0f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom-right
+                -1.0f, 1.0f, 1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // top-right
+                // right face
+                1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // top-left
+                1.0f, -1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom-right
+                1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 1.0f, // top-right
+                1.0f, -1.0f, -1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, // bottom-right
+                1.0f, 1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 1.0f, 0.0f, // top-left
+                1.0f, -1.0f, 1.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, // bottom-left
+                // bottom face
+                -1.0f, -1.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, // top-right
+                1.0f, -1.0f, -1.0f, 0.0f, -1.0f, 0.0f, 1.0f, 1.0f, // top-left
+                1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, // bottom-left
+                1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 0.0f, 1.0f, 0.0f, // bottom-left
+                -1.0f, -1.0f, 1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, // bottom-right
+                -1.0f, -1.0f, -1.0f, 0.0f, -1.0f, 0.0f, 0.0f, 1.0f, // top-right
+                // top face
+                -1.0f, 1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, // top-left
+                1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, // bottom-right
+                1.0f, 1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 1.0f, // top-right
+                1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f, 0.0f, // bottom-right
+                -1.0f, 1.0f, -1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 1.0f, // top-left
+                -1.0f, 1.0f, 1.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f  // bottom-left
+        };
+
+        glGenVertexArrays(1, &cube_vao);
+        glGenBuffers(1, &cube_vbo);
+
+        glBindVertexArray(cube_vao);
+
+        // fill buffer
+        glBindBuffer(GL_ARRAY_BUFFER, cube_vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), nullptr);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (3 * sizeof(float)));
+        glEnableVertexAttribArray(2);
+        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void *) (6 * sizeof(float)));
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        glBindVertexArray(0);
+    }
+
+    // render Cube
+    glBindVertexArray(cube_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 36);
+    glBindVertexArray(0);
 }
