@@ -201,6 +201,7 @@ int main() {
     bool enable_texture = true;
     bool enable_tangent = false;
     bool use_whiteout = false;
+    bool gamma_correction = true;
     float DISP = 0.1f;
 
     float triplanar_scale = 0.08;
@@ -221,6 +222,7 @@ int main() {
         ImGui::Checkbox("Show Lighting: ", &enable_light);
         ImGui::Checkbox("Enable Tangent: ", &enable_tangent);
         ImGui::Checkbox("Use Whiteout: ", &use_whiteout);
+        ImGui::Checkbox("Gamma Correction: ", &gamma_correction);
 
         ImGui::NewLine();
         ImGui::InputFloat("scale: ", &scale, 0, 0.00005f, "%.6f");
@@ -313,7 +315,8 @@ int main() {
                 .set_bool("enable_light", enable_light)
                 .set_bool("enable_texture", enable_texture)
                 .set_bool("enable_tangent", enable_tangent)
-                .set_bool("use_whiteout", use_whiteout);
+                .set_bool("use_whiteout", use_whiteout)
+                .set_bool("gamma_correction", gamma_correction);
 
         for (auto &map: map_data) {
             glActiveTexture(GL_TEXTURE0);

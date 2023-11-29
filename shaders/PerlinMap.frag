@@ -44,6 +44,7 @@ uniform bool enable_light;
 uniform bool enable_texture;
 uniform bool enable_tangent;
 uniform bool use_whiteout;
+uniform bool gamma_correction;
 
 out vec4 FragColor;
 
@@ -197,6 +198,10 @@ void main()
             color.xyz,
             ao
         );
+    }
+
+    if (gamma_correction) {
+        color.rgb = pow(color.rgb, vec3(1.0 / 2.2));
     }
 
     //    FragColor = vec4(data.blended_normal, 1.0f);
