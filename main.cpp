@@ -21,6 +21,9 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
 
+std::tuple<unsigned int, unsigned int, unsigned int>
+render_sky_box(utilities::shader &shader_program, const unsigned int &hdr_texture);
+
 void render_cube();
 
 const int SCR_WIDTH = 1280;
@@ -31,7 +34,7 @@ const unsigned short NUM_PATCH_PTS = 4;
 float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
-const int cube_map_resolution = 1080;
+const int cube_map_resolution = 4096;
 
 const unsigned patch_numbers = 16;
 
@@ -60,19 +63,17 @@ int main() {
         return -1;
     }
 
-    glEnable(GL_DEPTH_TEST);
-    // set depth function to less than AND equal for skybox depth trick.
-    glDepthFunc(GL_LEQUAL);
-
     utilities::create_im_gui_context(window, "#version 460");
 
     GLint maxTessLevel;
     glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
     std::cout << "Max available tess level: " << maxTessLevel << std::endl;
 
-    // enable depth test
     glEnable(GL_DEPTH_TEST);
+    // set depth function to less than AND equal for skybox depth trick.
+    glDepthFunc(GL_LEQUAL);
 
+#pragma region load shader programe
     utilities::shader_t shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"),
                                        std::string("PerlinMap.frag"), std::string("PerlinMap.tesc"),
                                        std::string("PerlinMap.tese"));
@@ -86,9 +87,9 @@ int main() {
 
     utilities::shader background_shader(std::string("../shaders/"), std::string("BackGround.vert"),
                                         std::string("BackGround.frag"));
+#pragma endregion
 
-    background_shader.use();
-    background_shader.set_int("environment_map", 0);
+#pragma region generate vertices of plane
 
     std::vector<float> vertices;
 
@@ -99,6 +100,10 @@ int main() {
 
     // configure the cube's VAO (and terrainVBO)
     auto [terrain_vao, terrain_vbo] = terrain::create_terrain(vertices);
+
+#pragma endregion
+
+#pragma region generate height data
 
     siv::PerlinNoise::seed_type seed(683647643u);
     siv::PerlinNoise perlin(seed);
@@ -130,6 +135,7 @@ int main() {
                              )});
         }
     }
+#pragma endregion
 
     // Specify the number of vertices per patch
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
@@ -140,97 +146,21 @@ int main() {
     shader_program_debug.use();
     shader_program_debug.set_int("height_map", 0).set_float("terrain_height", terrain_height);
 
-#pragma sky box
+    background_shader.use();
+    background_shader.set_int("environment_map", 0);
 
-    // set framebuffer and renderbuffer for rending sky box
-    unsigned int capture_fbo, capture_rbo;
-    // generate framebuffer and renderbuffer
-    glGenFramebuffers(1, &capture_fbo);
-    glGenRenderbuffers(1, &capture_rbo);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
-
-    // set render buffer as depth attachment
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_resolution, cube_map_resolution);
-    // bind depth attachment for framebuffer
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
+#pragma region hdr texture to sky box
 
     // load hdr texture
     stbi_set_flip_vertically_on_load(true);
     unsigned int hdr_texture = utilities::load_texture(std::string("../assets/images/"),
                                                        std::string("farm_field_puresky_4k.hdr"), true);
 
-    // generate a empty texture as sky box
-    unsigned int env_cube_map;
-    glGenTextures(1, &env_cube_map);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map);
+    auto [capture_fbo, capture_rbo, env_cube_map_id] = render_sky_box(cube_map_shader, hdr_texture);
 
-    // bind every face of texture for cube map
-    for (int i = 0; i < 6; ++i) {
-        // note that store each face with 16 bit floating point values
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
-                     cube_map_resolution, cube_map_resolution, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
+#pragma endregion
 
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // fov 90 to capture all scene
-    glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-    // the view matrix of every faces
-    glm::mat4 capture_views[] =
-            {
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
-                                glm::vec3(0.0f, 0.0f, 1.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f),
-                                glm::vec3(0.0f, 0.0f, -1.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f))
-            };
-
-    // convert HDR equirectangular environment map to cube map equivalent
-    cube_map_shader.use();
-    cube_map_shader
-            .set_int("equirectangular_map", 0)
-            .set_mat4("projection", capture_projection);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, hdr_texture);
-
-    // configure the viewport to the capture dimensions.
-    glViewport(0, 0, cube_map_resolution, cube_map_resolution);
-
-    // render sky box to framer buffer
-    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
-    for (int i = 0; i < 6; ++i) {
-        cube_map_shader.set_mat4("view", capture_views[i]);
-
-        // set cube map texture as texture attachment
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, env_cube_map, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        render_cube();
-    }
-
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-#pragma endregion sky box
-
-
-#pragma set texture to shader
+#pragma region set terrain texture to shader
 
     // load texture
     std::vector<unsigned int> diff_textures;
@@ -249,6 +179,9 @@ int main() {
 
 #pragma endregion set texture to shaders
 
+#pragma region specify height range of different terrain environment
+
+    // height range of each texture
     std::vector<float> height({0.0f, 0.2f, 0.5f, 0.7f, 0.9f, 1.0f});
 
     for (int i = 0; i < height.size(); ++i) {
@@ -256,6 +189,10 @@ int main() {
         std::string uniform_name("material.height[" + std::to_string(i) + "]");
         shader_program.set_float(uniform_name, height[i]);
     }
+
+#pragma endregion
+
+#pragma region shader option
 
     float y_value = 0.005184f;
     float HEIGHT_SCALE = 0.358f;
@@ -326,6 +263,8 @@ int main() {
         }
     };
 
+#pragma endregion option
+
     glViewport(0, 0, SCR_WIDTH, SCR_HEIGHT);
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
@@ -355,6 +294,8 @@ int main() {
 
         // calculate the model matrix for each object and pass it to shader before drawing
         glm::mat4 model = glm::mat4(1.0f);
+
+#pragma region render terrain
 
         shader_program.use();
         shader_program
@@ -390,6 +331,10 @@ int main() {
             glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
         }
 
+#pragma endregion
+
+#pragma region render normal of terrain
+
         if (show_normal) {
             shader_program_debug.use();
             shader_program_debug
@@ -415,6 +360,10 @@ int main() {
             }
         }
 
+#pragma endregion
+
+#pragma region render sky box
+
         // render skybox (render as last to prevent overdraw)
         background_shader.use();
         background_shader
@@ -422,8 +371,10 @@ int main() {
                 .set_mat4("view", view);
         // bind texture0 to cube map
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
         render_cube();
+
+#pragma endregion
 
         utilities::render_im_gui();
 
@@ -433,15 +384,23 @@ int main() {
         glfwPollEvents();
     }
 
+#pragma region clean memory
+
     glDeleteVertexArrays(1, &terrain_vao);
     glDeleteBuffers(1, &terrain_vbo);
     glDeleteProgram(shader_program.id);
+    glDeleteFramebuffers(1, &capture_fbo);
+    glDeleteRenderbuffers(1, &capture_rbo);
 
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
     glfwTerminate();
+
+#pragma endregion
+
+
     return 0;
 }
 
@@ -578,4 +537,89 @@ void render_cube() {
     glBindVertexArray(cube_vao);
     glDrawArrays(GL_TRIANGLES, 0, 36);
     glBindVertexArray(0);
+}
+
+std::tuple<unsigned int, unsigned int, unsigned int>
+render_sky_box(utilities::shader &shader_program, const unsigned int &hdr_texture) {
+    // set framebuffer and renderbuffer for rending sky box
+    unsigned int capture_fbo, capture_rbo;
+    // generate framebuffer and renderbuffer
+    glGenFramebuffers(1, &capture_fbo);
+    glGenRenderbuffers(1, &capture_rbo);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+
+    // set render buffer as depth attachment
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_resolution, cube_map_resolution);
+    // bind depth attachment for framebuffer
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
+
+    // generate a empty texture as sky box
+    unsigned int env_cube_map_id;
+    glGenTextures(1, &env_cube_map_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
+
+    // bind every face of texture for cube map
+    for (int i = 0; i < 6; ++i) {
+        // note that store each face with 16 bit floating point values
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+                     cube_map_resolution, cube_map_resolution, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // fov 90 to capture all scene
+    glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    // the view matrix of every faces
+    glm::mat4 capture_views[] =
+            {
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+                                glm::vec3(0.0f, 0.0f, 1.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f),
+                                glm::vec3(0.0f, 0.0f, -1.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f))
+            };
+
+    // convert HDR equirectangular environment map to cube map equivalent
+    shader_program.use();
+    shader_program
+            .set_int("equirectangular_map", 0)
+            .set_mat4("projection", capture_projection);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdr_texture);
+
+    // configure the viewport to the capture dimensions.
+    glViewport(0, 0, cube_map_resolution, cube_map_resolution);
+
+    // render sky box to framer buffer
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    for (int i = 0; i < 6; ++i) {
+        shader_program.set_mat4("view", capture_views[i]);
+
+        // set cube map texture as texture attachment
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, env_cube_map_id, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        render_cube();
+    }
+
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return {capture_fbo, capture_rbo, env_cube_map_id};
 }

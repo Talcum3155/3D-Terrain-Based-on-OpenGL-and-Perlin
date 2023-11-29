@@ -13,7 +13,6 @@ void main()
     // discard translate operation of view
     mat4 rot_view = mat4(mat3(view));
     vec4 clipPos = projection * rot_view * vec4(world_pos, 1.0);
-//    vec4 clipPos = projection * view * vec4(world_pos, 1.0);
 
     // use xyww to make the depth keep max dpeth value: 1.0
     gl_Position = clipPos.xyww;
