@@ -37,13 +37,15 @@ render_irradiance_map(utilities::shader &irradiance_shader, unsigned int &env_cu
 
 unsigned int
 render_prefilter_map(utilities::shader &prefilter_shader, unsigned int &env_cube_map_id,
-                     unsigned int &capture_fbo, unsigned int &capture_rbo);
+                     unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views);
 
 unsigned int
 render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &env_cube_map_id,
                     unsigned int &capture_fbo, unsigned int &capture_rbo);
 
 void render_cube();
+
+void render_quad();
 
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
@@ -55,6 +57,7 @@ float lastFrame = 0.0f;
 
 const int cube_map_resolution = 4096;
 const int irradiance_resolution = 32;
+const int prefilter_resolution = 128;
 
 const unsigned patch_numbers = 16;
 
@@ -113,8 +116,8 @@ int main() {
     utilities::shader irradiance_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
                                         std::string("IrradianceConvolution.frag"));
 
-    utilities::shader prefilter_shader(std::string("../shaders/"), std::string(""),
-                                       std::string(""));
+    utilities::shader prefilter_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
+                                       std::string("Prefilter.frag"));
 
     utilities::shader brdf_lut_shader(std::string("../shaders/"), std::string(""),
                                       std::string(""));
@@ -177,12 +180,6 @@ int main() {
 
     shader_program_debug.use();
     shader_program_debug.set_int("height_map", 0).set_float("terrain_height", terrain_height);
-
-    background_shader.use();
-    background_shader.set_int("environment_map", 0);
-
-    irradiance_shader.use();
-    irradiance_shader.set_int("environment_map", 0);
 
 #pragma region hdr texture to sky box
 
@@ -409,7 +406,7 @@ int main() {
                 .set_mat4("view", view);
         // bind texture0 to cube map
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map_id);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map_id);
         render_cube();
 
 #pragma endregion
@@ -581,10 +578,39 @@ void render_cube() {
     glBindVertexArray(0);
 }
 
+// renderQuad() renders a 1x1 XY quad in NDC
+void render_quad() {
+    static unsigned int quadVAO;
+    static unsigned int quadVBO;
+
+    if (quadVAO == 0) {
+        float quadVertices[] = {
+                // positions        // texture Coords
+                -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
+                -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+                1.0f, 1.0f, 0.0f, 1.0f, 1.0f,
+                1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+        };
+        // setup plane VAO
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) 0);
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) (3 * sizeof(float)));
+    }
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
 std::tuple<unsigned int, unsigned int>
 pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_id,
                 utilities::shader &irradiance_shader, unsigned int &irradiance_map_id,
-                utilities::shader &prefilter_shader, unsigned int &prefilter_map,
+                utilities::shader &prefilter_shader, unsigned int &prefilter_map_id,
                 utilities::shader &brdf_shader, unsigned int &brdf_lut_map) {
 
     // set framebuffer and renderbuffer for rending sky box
@@ -619,17 +645,23 @@ pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_i
 
     cube_map_shader.use();
     cube_map_shader
-            .set_int("equirectangular_map", 0)
+            .set_int("environment_map", 0)
             .set_mat4("projection", capture_projection);
     env_cube_map_id = render_sky_box(cube_map_shader, hdr_texture,
                                      capture_fbo, capture_rbo, capture_views);
 
     irradiance_shader.use();
     irradiance_shader
-            .set_int("equirectangular_map", 0)
+            .set_int("environment_map", 0)
             .set_mat4("projection", capture_projection);
     irradiance_map_id = render_irradiance_map(irradiance_shader, env_cube_map_id,
                                               capture_fbo, capture_rbo, capture_views);
+
+    prefilter_shader.use();
+    prefilter_shader
+            .set_int("environment_map", 0)
+            .set_mat4("projection", capture_projection);
+    prefilter_map_id = render_prefilter_map(prefilter_shader, env_cube_map_id, capture_fbo, capture_rbo, capture_views);
 
     return {capture_fbo, capture_rbo};
 }
@@ -660,7 +692,8 @@ render_sky_box(utilities::shader &cube_map_shader, unsigned int &hdr_texture,
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // enable trilinear filtering for prefilter map stage
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     // convert HDR equirectangular environment map to cube map equivalent
@@ -685,7 +718,7 @@ render_sky_box(utilities::shader &cube_map_shader, unsigned int &hdr_texture,
         render_cube();
     }
 
-    // then let OpenGL generate mipmaps from first mip face (combating visible dots artifact)
+    // let OpenGL generate mipmaps from first mip face (combating visible dots artifact)
     glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
@@ -730,7 +763,6 @@ render_irradiance_map(utilities::shader &irradiance_shader, unsigned int &env_cu
     // configure the viewport to the capture dimensions.
     glViewport(0, 0, irradiance_resolution, irradiance_resolution);
 
-    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
     // render each face of irradiance cube map
     for (unsigned int i = 0; i < 6; ++i) {
         irradiance_shader.set_mat4("view", capture_views[i]);
@@ -748,8 +780,60 @@ render_irradiance_map(utilities::shader &irradiance_shader, unsigned int &env_cu
 
 unsigned int
 render_prefilter_map(utilities::shader &prefilter_shader, unsigned int &env_cube_map_id,
-                     unsigned int &capture_fbo, unsigned int &capture_rbo) {
+                     unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views) {
+    unsigned int prefilter_map_id;
+    glGenTextures(1, &prefilter_map_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map_id);
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+                     prefilter_resolution, prefilter_resolution, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
+    // be sure to set minification filter to mip_linear
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // generate mipmaps for the cube map so OpenGL automatically allocates the required memory.
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    int maxMipLevels = 5;
+    // render prefilter map for each mipmap level
+    for (int mip = 0; mip < maxMipLevels; ++mip) {
+
+        // reduce mipmap resolution with each iteration
+        auto mip_width = static_cast<GLsizei>(128 * std::pow(0.5, mip));
+        auto mip_height = static_cast<GLsizei>(128 * std::pow(0.5, mip));
+
+        // Reset the resolution of the depth attachment to match mipmap level
+        glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mip_width, mip_height);
+        glViewport(0, 0, mip_width, mip_height);
+
+        // calculate the roughness for each mipmap level
+        auto roughness = static_cast<float>(mip) / static_cast<float>(maxMipLevels - 1);
+        prefilter_shader.set_float("roughness", roughness);
+
+        // render each face once
+        for (unsigned int i = 0; i < 6; ++i) {
+            prefilter_shader.set_mat4("view", capture_views[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilter_map_id, mip);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            render_cube();
+        }
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return prefilter_map_id;
 }
 
 unsigned int
