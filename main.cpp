@@ -40,8 +40,7 @@ render_prefilter_map(utilities::shader &prefilter_shader, unsigned int &env_cube
                      unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views);
 
 unsigned int
-render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &env_cube_map_id,
-                    unsigned int &capture_fbo, unsigned int &capture_rbo);
+render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &capture_fbo, unsigned int &capture_rbo);
 
 void render_cube();
 
@@ -58,6 +57,7 @@ float lastFrame = 0.0f;
 const int cube_map_resolution = 4096;
 const int irradiance_resolution = 32;
 const int prefilter_resolution = 128;
+const int brdf_resolution = 512;
 
 const unsigned patch_numbers = 16;
 
@@ -119,8 +119,8 @@ int main() {
     utilities::shader prefilter_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
                                        std::string("Prefilter.frag"));
 
-    utilities::shader brdf_lut_shader(std::string("../shaders/"), std::string(""),
-                                      std::string(""));
+    utilities::shader brdf_lut_shader(std::string("../shaders/"), std::string("BRDF.vert"),
+                                      std::string("BRDF.frag"));
 
 #pragma endregion
 
@@ -580,10 +580,10 @@ void render_cube() {
 
 // renderQuad() renders a 1x1 XY quad in NDC
 void render_quad() {
-    static unsigned int quadVAO;
-    static unsigned int quadVBO;
+    static unsigned int quad_vao;
+    static unsigned int quad_vbo;
 
-    if (quadVAO == 0) {
+    if (quad_vao == 0) {
         float quadVertices[] = {
                 // positions        // texture Coords
                 -1.0f, 1.0f, 0.0f, 0.0f, 1.0f,
@@ -592,17 +592,18 @@ void render_quad() {
                 1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
         };
         // setup plane VAO
-        glGenVertexArrays(1, &quadVAO);
-        glGenBuffers(1, &quadVBO);
-        glBindVertexArray(quadVAO);
-        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glGenVertexArrays(1, &quad_vao);
+        glGenBuffers(1, &quad_vbo);
+        glBindVertexArray(quad_vao);
+        glBindBuffer(GL_ARRAY_BUFFER, quad_vbo);
         glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) 0);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
         glEnableVertexAttribArray(1);
         glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void *) (3 * sizeof(float)));
     }
-    glBindVertexArray(quadVAO);
+
+    glBindVertexArray(quad_vao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 }
@@ -611,7 +612,7 @@ std::tuple<unsigned int, unsigned int>
 pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_id,
                 utilities::shader &irradiance_shader, unsigned int &irradiance_map_id,
                 utilities::shader &prefilter_shader, unsigned int &prefilter_map_id,
-                utilities::shader &brdf_shader, unsigned int &brdf_lut_map) {
+                utilities::shader &brdf_shader, unsigned int &brdf_lut_map_id) {
 
     // set framebuffer and renderbuffer for rending sky box
     unsigned int capture_fbo, capture_rbo;
@@ -662,6 +663,9 @@ pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_i
             .set_int("environment_map", 0)
             .set_mat4("projection", capture_projection);
     prefilter_map_id = render_prefilter_map(prefilter_shader, env_cube_map_id, capture_fbo, capture_rbo, capture_views);
+
+    brdf_shader.use();
+    brdf_lut_map_id = render_brdf_lut_map(brdf_shader, capture_fbo, capture_rbo);
 
     return {capture_fbo, capture_rbo};
 }
@@ -837,7 +841,32 @@ render_prefilter_map(utilities::shader &prefilter_shader, unsigned int &env_cube
 }
 
 unsigned int
-render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &env_cube_map_id,
-                    unsigned int &capture_fbo, unsigned int &capture_rbo) {
+render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &capture_fbo, unsigned int &capture_rbo) {
+    unsigned int brdf_lut_map_id;
+    glGenTextures(1, &brdf_lut_map_id);
 
+    // pre-allocate enough memory for the LUT texture.
+    glBindTexture(GL_TEXTURE_2D, brdf_lut_map_id);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, brdf_resolution, brdf_resolution, 0, GL_RG, GL_FLOAT, nullptr);
+    // be sure to set wrapping mode to GL_CLAMP_TO_EDGE
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // then re-configure capture framebuffer object and render screen-space quad with BRDF shader.
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, brdf_resolution, brdf_resolution);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdf_lut_map_id, 0);
+
+    glViewport(0, 0, brdf_resolution, brdf_resolution);
+
+    brdf_shader.use();
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    render_quad();
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    return brdf_lut_map_id;
 }
