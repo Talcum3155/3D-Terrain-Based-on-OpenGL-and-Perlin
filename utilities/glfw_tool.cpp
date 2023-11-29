@@ -294,9 +294,11 @@ namespace utilities {
 
             stbi_image_free(data);
         } else {
-            std::cout << "Failed to load HDR image." << std::endl;
+            stbi_image_free(data);
+            throw std::runtime_error("Texture failed to load at path: " + absolute_path + texture_name);
         }
 
+        glBindTexture(GL_TEXTURE_2D, 0);
         return hdr_texture;
     }
 

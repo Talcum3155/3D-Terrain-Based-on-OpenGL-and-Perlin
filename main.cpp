@@ -21,8 +21,9 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
 
-std::tuple<unsigned int, unsigned int, unsigned int>
-render_sky_box(utilities::shader &shader_program, const unsigned int &hdr_texture);
+std::tuple<unsigned int, unsigned int, unsigned int, unsigned int>
+render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_shader,
+               const unsigned int &hdr_texture);
 
 void render_cube();
 
@@ -35,6 +36,7 @@ float deltaTime = 0.0f;    // time between current frame and last frame
 float lastFrame = 0.0f;
 
 const int cube_map_resolution = 4096;
+const int irradiance_resolution = 32;
 
 const unsigned patch_numbers = 16;
 
@@ -69,6 +71,8 @@ int main() {
     glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &maxTessLevel);
     std::cout << "Max available tess level: " << maxTessLevel << std::endl;
 
+    // seamless cube map
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
     glEnable(GL_DEPTH_TEST);
     // set depth function to less than AND equal for skybox depth trick.
     glDepthFunc(GL_LEQUAL);
@@ -87,6 +91,10 @@ int main() {
 
     utilities::shader background_shader(std::string("../shaders/"), std::string("BackGround.vert"),
                                         std::string("BackGround.frag"));
+
+    utilities::shader irradiance_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
+                                        std::string("IrradianceConvolution.frag"));
+
 #pragma endregion
 
 #pragma region generate vertices of plane
@@ -149,14 +157,19 @@ int main() {
     background_shader.use();
     background_shader.set_int("environment_map", 0);
 
+    irradiance_shader.use();
+    irradiance_shader.set_int("environment_map", 0);
+
 #pragma region hdr texture to sky box
 
     // load hdr texture
     stbi_set_flip_vertically_on_load(true);
     unsigned int hdr_texture = utilities::load_texture(std::string("../assets/images/"),
-                                                       std::string("farm_field_puresky_4k.hdr"), true);
+                                                       std::string("blue_photo_studio_4k.hdr"), true);
 
-    auto [capture_fbo, capture_rbo, env_cube_map_id] = render_sky_box(cube_map_shader, hdr_texture);
+    auto [capture_fbo, capture_rbo,
+            env_cube_map_id, irradiance_map_id]
+            = render_sky_box(cube_map_shader, irradiance_shader, hdr_texture);
 
 #pragma endregion
 
@@ -392,6 +405,10 @@ int main() {
     glDeleteVertexArrays(1, &terrain_vao);
     glDeleteBuffers(1, &terrain_vbo);
     glDeleteProgram(shader_program.id);
+    glDeleteProgram(shader_program_debug.id);
+    glDeleteProgram(background_shader.id);
+    glDeleteProgram(irradiance_shader.id);
+    glDeleteProgram(cube_map_shader.id);
     glDeleteFramebuffers(1, &capture_fbo);
     glDeleteRenderbuffers(1, &capture_rbo);
 
@@ -542,8 +559,10 @@ void render_cube() {
     glBindVertexArray(0);
 }
 
-std::tuple<unsigned int, unsigned int, unsigned int>
-render_sky_box(utilities::shader &shader_program, const unsigned int &hdr_texture) {
+std::tuple<unsigned int, unsigned int, unsigned int, unsigned int>
+render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_shader,
+               const unsigned int &hdr_texture) {
+
     // set framebuffer and renderbuffer for rending sky box
     unsigned int capture_fbo, capture_rbo;
     // generate framebuffer and renderbuffer
@@ -558,7 +577,7 @@ render_sky_box(utilities::shader &shader_program, const unsigned int &hdr_textur
     // bind depth attachment for framebuffer
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
 
-    // generate a empty texture as sky box
+    // generate an empty texture as sky box
     unsigned int env_cube_map_id;
     glGenTextures(1, &env_cube_map_id);
     glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
@@ -624,5 +643,50 @@ render_sky_box(utilities::shader &shader_program, const unsigned int &hdr_textur
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    return {capture_fbo, capture_rbo, env_cube_map_id};
+#pragma region irradiance convolution
+
+    unsigned int irradiance_map_id;
+    glGenTextures(1, &irradiance_map_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map_id);
+    // set texture type
+    for (unsigned int i = 0; i < 6; ++i) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+                     irradiance_resolution, irradiance_resolution, 0,
+                     GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, irradiance_resolution, irradiance_resolution);
+
+    irradiance_shader.use();
+    irradiance_shader
+            .set_mat4("projection", capture_projection);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
+
+    // configure the viewport to the capture dimensions.
+    glViewport(0, 0, irradiance_resolution, irradiance_resolution);
+    glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+    // render each face of irradiance cube map
+    for (unsigned int i = 0; i < 6; ++i) {
+        irradiance_shader.set_mat4("view", capture_views[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                               GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradiance_map_id, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        render_cube();
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+#pragma endregion
+
+    return {capture_fbo, capture_rbo, env_cube_map_id, irradiance_map_id};
 }
