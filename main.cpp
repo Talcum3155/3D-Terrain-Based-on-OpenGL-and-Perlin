@@ -44,7 +44,7 @@ const int map_height = 256;
 const int texture_width = map_width + 2;
 const int texture_height = map_height + 2;
 
-const int terrain_height = 600;
+const int terrain_height = 400;
 
 const int render_distance = 3;
 
@@ -204,7 +204,7 @@ int main() {
     bool gamma_correction = true;
     float DISP = 0.1f;
 
-    float triplanar_scale = 0.08;
+    float triplanar_scale = 0.05;
     int triplanar_sharpness = 8;
 
     float ambient_strength = 0.1;

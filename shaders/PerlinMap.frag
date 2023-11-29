@@ -173,7 +173,7 @@ void main()
     get_tex_data();
     //    compute_normal_weight();
 
-    mat3 tbn = mat3(data.tangent, data.bitangent, data.w_normal);
+    mat3 tbn = mat3(normalize(data.tangent), normalize(data.bitangent), normalize(data.w_normal));
 
     vec3 color = vec3(data.height_01, data.height_01, data.height_01);
     float ao = 1.0f;
@@ -201,7 +201,7 @@ void main()
     }
 
     if (gamma_correction) {
-        color.rgb = pow(color.rgb, vec3(1.0 / 2.2));
+        color.rgb = pow(color.rgb / (color.rgb + vec3(1.0)), vec3(1.0 / 2.2));
     }
 
     //    FragColor = vec4(data.blended_normal, 1.0f);
