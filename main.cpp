@@ -21,9 +21,27 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
 
-std::tuple<unsigned int, unsigned int, unsigned int, unsigned int>
-render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_shader,
-               const unsigned int &hdr_texture);
+std::tuple<unsigned int, unsigned int>
+pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_id,
+                utilities::shader &irradiance_shader, unsigned int &irradiance_map_id,
+                utilities::shader &prefilter_shader, unsigned int &prefilter_map_id,
+                utilities::shader &brdf_shader, unsigned int &brdf_lut_map_id);
+
+unsigned int
+render_sky_box(utilities::shader &cube_map_shader, unsigned int &hdr_texture,
+               unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views);
+
+unsigned int
+render_irradiance_map(utilities::shader &irradiance_shader, unsigned int &env_cube_map_id,
+                      unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views);
+
+unsigned int
+render_prefilter_map(utilities::shader &prefilter_shader, unsigned int &env_cube_map_id,
+                     unsigned int &capture_fbo, unsigned int &capture_rbo);
+
+unsigned int
+render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &env_cube_map_id,
+                    unsigned int &capture_fbo, unsigned int &capture_rbo);
 
 void render_cube();
 
@@ -95,6 +113,12 @@ int main() {
     utilities::shader irradiance_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
                                         std::string("IrradianceConvolution.frag"));
 
+    utilities::shader prefilter_shader(std::string("../shaders/"), std::string(""),
+                                       std::string(""));
+
+    utilities::shader brdf_lut_shader(std::string("../shaders/"), std::string(""),
+                                      std::string(""));
+
 #pragma endregion
 
 #pragma region generate vertices of plane
@@ -162,14 +186,12 @@ int main() {
 
 #pragma region hdr texture to sky box
 
-    // load hdr texture
-    stbi_set_flip_vertically_on_load(true);
-    unsigned int hdr_texture = utilities::load_texture(std::string("../assets/images/"),
-                                                       std::string("blue_photo_studio_4k.hdr"), true);
-
-    auto [capture_fbo, capture_rbo,
-            env_cube_map_id, irradiance_map_id]
-            = render_sky_box(cube_map_shader, irradiance_shader, hdr_texture);
+    unsigned int env_cube_map_id, irradiance_map_id, prefilter_map_id, brdf_lut_map_id;
+    auto [capture_fbo, capture_rbo] =
+            pbr_pre_process(cube_map_shader, env_cube_map_id,
+                            irradiance_shader, irradiance_map_id,
+                            prefilter_shader, prefilter_map_id,
+                            brdf_lut_shader, brdf_lut_map_id);
 
 #pragma endregion
 
@@ -180,14 +202,14 @@ int main() {
     std::vector<unsigned int> ao_textures;
     std::vector<unsigned int> norm_texture;
 //    std::vector<unsigned int> disp_texture;
-    load_material_texture(diff_textures, ao_textures, norm_texture);
+//    load_material_texture(diff_textures, ao_textures, norm_texture);
 
     int texture_index = 1;
     shader_program.use();
 
-    set_texture(diff_textures, texture_index, "diff", shader_program);
-    set_texture(ao_textures, texture_index, "ao", shader_program);
-    set_texture(norm_texture, texture_index, "norm", shader_program);
+//    set_texture(diff_textures, texture_index, "diff", shader_program);
+//    set_texture(ao_textures, texture_index, "ao", shader_program);
+//    set_texture(norm_texture, texture_index, "norm", shader_program);
 //    set_texture(disp_texture, texture_index, "disp", shader_program);
 
 #pragma endregion set texture to shaders
@@ -387,7 +409,7 @@ int main() {
                 .set_mat4("view", view);
         // bind texture0 to cube map
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map_id);
         render_cube();
 
 #pragma endregion
@@ -559,9 +581,11 @@ void render_cube() {
     glBindVertexArray(0);
 }
 
-std::tuple<unsigned int, unsigned int, unsigned int, unsigned int>
-render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_shader,
-               const unsigned int &hdr_texture) {
+std::tuple<unsigned int, unsigned int>
+pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_id,
+                utilities::shader &irradiance_shader, unsigned int &irradiance_map_id,
+                utilities::shader &prefilter_shader, unsigned int &prefilter_map,
+                utilities::shader &brdf_shader, unsigned int &brdf_lut_map) {
 
     // set framebuffer and renderbuffer for rending sky box
     unsigned int capture_fbo, capture_rbo;
@@ -569,6 +593,50 @@ render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_
     glGenFramebuffers(1, &capture_fbo);
     glGenRenderbuffers(1, &capture_rbo);
 
+    // load hdr texture
+    stbi_set_flip_vertically_on_load(true);
+    unsigned int hdr_texture = utilities::load_texture(std::string("../assets/images/"),
+                                                       std::string("blue_photo_studio_4k.hdr"), true);
+
+    // fov 90 to capture all scene
+    glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    // the view matrix of every faces
+    std::vector<glm::mat4> capture_views =
+            {
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
+                                glm::vec3(0.0f, 0.0f, 1.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f),
+                                glm::vec3(0.0f, 0.0f, -1.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f)),
+                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
+                                glm::vec3(0.0f, -1.0f, 0.0f))
+            };
+
+    cube_map_shader.use();
+    cube_map_shader
+            .set_int("equirectangular_map", 0)
+            .set_mat4("projection", capture_projection);
+    env_cube_map_id = render_sky_box(cube_map_shader, hdr_texture,
+                                     capture_fbo, capture_rbo, capture_views);
+
+    irradiance_shader.use();
+    irradiance_shader
+            .set_int("equirectangular_map", 0)
+            .set_mat4("projection", capture_projection);
+    irradiance_map_id = render_irradiance_map(irradiance_shader, env_cube_map_id,
+                                              capture_fbo, capture_rbo, capture_views);
+
+    return {capture_fbo, capture_rbo};
+}
+
+unsigned int
+render_sky_box(utilities::shader &cube_map_shader, unsigned int &hdr_texture,
+               unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views) {
     glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
     glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
 
@@ -595,30 +663,8 @@ render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    // fov 90 to capture all scene
-    glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-    // the view matrix of every faces
-    glm::mat4 capture_views[] =
-            {
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f),
-                                glm::vec3(0.0f, 0.0f, 1.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f),
-                                glm::vec3(0.0f, 0.0f, -1.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f)),
-                    glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f),
-                                glm::vec3(0.0f, -1.0f, 0.0f))
-            };
-
     // convert HDR equirectangular environment map to cube map equivalent
-    shader_program.use();
-    shader_program
-            .set_int("equirectangular_map", 0)
-            .set_mat4("projection", capture_projection);
+    cube_map_shader.use();
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, hdr_texture);
@@ -629,25 +675,33 @@ render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_
     // render sky box to framer buffer
     glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
     for (int i = 0; i < 6; ++i) {
-        shader_program.set_mat4("view", capture_views[i]);
+        cube_map_shader.set_mat4("view", capture_views[i]);
 
         // set cube map texture as texture attachment
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, env_cube_map_id, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
         render_cube();
     }
 
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    // then let OpenGL generate mipmaps from first mip face (combating visible dots artifact)
+    glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-#pragma region irradiance convolution
+    return env_cube_map_id;
+}
+
+unsigned int
+render_irradiance_map(utilities::shader &irradiance_shader, unsigned int &env_cube_map_id,
+                      unsigned int &capture_fbo, unsigned int &capture_rbo, std::vector<glm::mat4> &capture_views) {
 
     unsigned int irradiance_map_id;
     glGenTextures(1, &irradiance_map_id);
     glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map_id);
+
     // set texture type
     for (unsigned int i = 0; i < 6; ++i) {
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
@@ -662,17 +716,20 @@ render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_
 
     glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
     glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+
+    // set render buffer as depth attachment
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, irradiance_resolution, irradiance_resolution);
+    // bind depth attachment for framebuffer
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
 
     irradiance_shader.use();
-    irradiance_shader
-            .set_mat4("projection", capture_projection);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
 
     // configure the viewport to the capture dimensions.
     glViewport(0, 0, irradiance_resolution, irradiance_resolution);
+
     glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
     // render each face of irradiance cube map
     for (unsigned int i = 0; i < 6; ++i) {
@@ -686,7 +743,17 @@ render_sky_box(utilities::shader &shader_program, utilities::shader &irradiance_
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-#pragma endregion
+    return irradiance_map_id;
+}
 
-    return {capture_fbo, capture_rbo, env_cube_map_id, irradiance_map_id};
+unsigned int
+render_prefilter_map(utilities::shader &prefilter_shader, unsigned int &env_cube_map_id,
+                     unsigned int &capture_fbo, unsigned int &capture_rbo) {
+
+}
+
+unsigned int
+render_brdf_lut_map(utilities::shader &brdf_shader, unsigned int &env_cube_map_id,
+                    unsigned int &capture_fbo, unsigned int &capture_rbo) {
+
 }
