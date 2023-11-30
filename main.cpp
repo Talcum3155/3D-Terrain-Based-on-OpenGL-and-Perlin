@@ -66,7 +66,7 @@ const int texture_height = map_height + 2;
 
 const int terrain_height = 400;
 
-const int render_distance = 3;
+const int render_distance = 2;
 
 int main() {
 
@@ -149,25 +149,6 @@ int main() {
     float layer_lacunarity = 0.6f;
     float layer_amplitude = 0.5f;
 
-    for (int x = -1; x <= 1; ++x) {
-        for (int y = -1; y <= 1; ++y) {
-            std::vector<float> height_data(texture_width * texture_height);
-
-//            terrain::get_height_map(height_data, perlin, texture_width, texture_height,
-//                                    scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude,
-//                                    static_cast<float>(x), static_cast<float>(y));
-
-            terrain::get_height_map(height_data, perlin, texture_width, texture_height,
-                                    scale, layer_count, static_cast<float>(x), static_cast<float>(y));
-
-            map_data.insert({std::pair<int, int>(x, y),
-                             terrain::map_chunk(x, y,
-                                                std::move(height_data),
-                                                terrain::load_height_map(
-                                                        texture_width, texture_height, height_data)
-                             )});
-        }
-    }
 #pragma endregion
 
     // Specify the number of vertices per patch
@@ -237,8 +218,8 @@ int main() {
     float y_value = 0.005184f;
     float HEIGHT_SCALE = 0.358f;
     bool show_normal = false;
-    bool enable_tangent = false;
-    bool use_whiteout = false;
+    bool enable_tangent = true;
+    bool use_whiteout = true;
     bool gamma_correction = true;
     int light_mode = 2;
     int texture_mode = 2;
@@ -315,6 +296,7 @@ int main() {
 //    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     while (!glfwWindowShouldClose(window)) {
 
+
         utilities::config_im_gui_loop("Debug", gui_config_callback);
 
         // per-frame time logic
@@ -333,7 +315,7 @@ int main() {
         // render the triangle
         glBindVertexArray(terrain_vao);
 
-        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 10000.0f);
+        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 500.0f);
 
         // camera/view transformation
         glm::mat4 view = cam.get_view_matrix();
@@ -362,20 +344,49 @@ int main() {
                 .set_int("light_mode", light_mode)
                 .set_int("texture_mode", texture_mode);
 
-        for (auto &map: map_data) {
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, map.second.height_map_id);
-            model = glm::mat4(1.0f);
-            model = glm::translate(model, glm::vec3
-                    (
-                            map.second.grid_x * map_width,
-                            0,
-                            map.second.grid_y * map_height
-                    ));
-            terrain_shader
-                    .set_mat4("model", model);
+        int current_grid_x = static_cast<int>(std::trunc(cam.position.x / map_width + 0.5));
+        int current_grid_y = static_cast<int>(std::trunc(cam.position.z / map_height + 0.5));
 
-            glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+        for (int x = -render_distance; x <= render_distance; ++x) {
+            for (int y = -render_distance; y <= render_distance; ++y) {
+
+                if (!map_data.contains({current_grid_x + x, current_grid_y + y})) {
+                    std::cout << "Generating pos:(" << current_grid_x + x << ", " << current_grid_y + y << ")"
+                              << std::endl;
+
+                    std::vector<float> height_data(texture_width * texture_height);
+                    terrain::get_height_map(height_data, perlin, texture_width, texture_height,
+                                            scale, layer_count, static_cast<float>(current_grid_x + x), static_cast<float>(current_grid_y + y));
+
+                    std::cout << "Generated pos:(" << current_grid_x + x << ", " << current_grid_y + y << ")"
+                              << std::endl;
+
+                    map_data.insert({std::pair<int, int>(current_grid_x + x, current_grid_y + y),
+                                     terrain::map_chunk(current_grid_x + x, current_grid_y + y,
+                                                        std::move(height_data),
+                                                        terrain::load_height_map(
+                                                                texture_width, texture_height, height_data)
+                                     )});
+
+                    std::cout << "Generated pos:(" << current_grid_x + x << ", " << current_grid_y + y << ")"
+                              << std::endl;
+                }
+
+                terrain::map_chunk &map = map_data.at({current_grid_x + x, current_grid_y + y});
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, map.height_map_id);
+                model = glm::mat4(1.0f);
+                model = glm::translate(model, glm::vec3
+                        (
+                                map.grid_x * map_width,
+                                0,
+                                map.grid_y * map_height
+                        ));
+                terrain_shader
+                        .set_mat4("model", model);
+
+                glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+            }
         }
 
 #pragma endregion
