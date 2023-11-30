@@ -70,9 +70,19 @@ void calculate_normal(vec2 tex_coord) {
     // Sample heights around the current texture coordinate
     float left = texture(height_map, tex_coord + vec2(-uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
     float right = texture(height_map, tex_coord + vec2(uTexelSize, 0.0)).x * HEIGHT_SCALE * 2.0 - 1.0;
-
     float up = texture(height_map, tex_coord + vec2(0.0, vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
     float down = texture(height_map, tex_coord + vec2(0.0, -vTexelSize)).x * HEIGHT_SCALE * 2.0 - 1.0;
+
+    // Diagonal samples
+    float up_left = texture(height_map, tex_coord + vec2(-uTexelSize, vTexelSize)).x;
+    float up_right = texture(height_map, tex_coord + vec2(uTexelSize, vTexelSize)).x;
+    float down_left = texture(height_map, tex_coord + vec2(-uTexelSize, -vTexelSize)).x;
+    float down_right = texture(height_map, tex_coord + vec2(uTexelSize, -vTexelSize)).x;
+
+    data.w_normal = normalize(vec3(left - right, uTexelSize, down - up));
+    data.w_normal += normalize(vec3(up_left - down_right, uTexelSize, down_left - up_right));
+
+    data.w_normal = normalize(data.w_normal);
 
     // construct the normal directly based on the cross-product formula.
     data.w_normal = normalize(vec3(left - right, uTexelSize, down - up));
