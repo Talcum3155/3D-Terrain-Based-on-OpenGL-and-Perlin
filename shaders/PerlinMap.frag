@@ -227,7 +227,7 @@ vec3 pbr_lighting(vec3 N, vec3 albedo, float ao, float roughness, float metallic
     //-----------------------------------------------------------------------------------------------------------------
 
     // combine ambient light and diffuse
-    return ambient + Lo;
+    return ambient * light.ambient_strength + Lo;
 }
 
 vec4 get_diff(vec2 tex) {

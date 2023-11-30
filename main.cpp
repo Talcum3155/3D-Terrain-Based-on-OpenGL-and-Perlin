@@ -75,6 +75,8 @@ const int terrain_height = 400;
 
 const int render_distance = 3;
 
+const int view_distance = 800;
+
 std::queue<terrain::map_chunk *> main_thread_task;
 
 int main() {
@@ -147,12 +149,12 @@ int main() {
 
 #pragma region generate height data
 
-    siv::PerlinNoise::seed_type seed(683647643u);
+    siv::PerlinNoise::seed_type seed(123456u);
     siv::PerlinNoise perlin(seed);
 
     std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> map_data;
 
-    float scale = 0.002f;
+    float scale = 0.004f;
     int layer_count = 10;
     float lacunarity = 1.8f;
     float layer_lacunarity = 0.6f;
@@ -218,7 +220,7 @@ int main() {
 #pragma region specify height range of different terrain environment
 
     // height range of each texture
-    std::vector<float> height({0.0f, 0.2f, 0.5f, 0.7f, 0.9f, 1.0f});
+    std::vector<float> height({0.0f, 0.25f, 0.6f, 0.8f, 0.9f, 1.0f});
 
     for (int i = 0; i < height.size(); ++i) {
         // set height data to shader
@@ -240,12 +242,12 @@ int main() {
     int texture_mode = 2;
     float DISP = 0.1f;
 
-    float triplanar_scale = 0.05;
+    float triplanar_scale = 0.02;
     int triplanar_sharpness = 8;
 
     float ambient_strength = 0.1;
     float light_x = 1.0f;
-    float light_y = 600.0f;
+    float light_y = 1000.0f;
     float light_z = 1.0f;
 
     // callback for im_gui
@@ -282,25 +284,33 @@ int main() {
 
         if (ImGui::Button("Generate Map")) {
 
-            for (auto &map: map_data) {
-//                terrain::get_height_map(map.second.height_data, perlin, map_width, map_height,
+            int current_grid_x = static_cast<int>(std::trunc(cam.position.x / map_width + 0.5));
+            int current_grid_y = static_cast<int>(std::trunc(cam.position.z / map_height + 0.5));
+
+            for (int x = current_grid_x - render_distance; x <= current_grid_x + render_distance; ++x) {
+                for (int y = current_grid_y - render_distance; y <= current_grid_y + render_distance; ++y) {
+
+                    terrain::map_chunk &map = map_data.at({x, y});
+
+                    //                terrain::get_height_map(map.second.height_data, perlin, map_width, map_height,
 //                                        scale, layer_count, lacunarity, layer_lacunarity, layer_amplitude,
 //                                        static_cast<float >(map.second.grid_x), static_cast<float>(map.second.grid_y));
 
-                terrain::get_height_map(map.second.height_data, perlin, texture_width, texture_height,
-                                        scale, layer_count, static_cast<float >(map.second.grid_x),
-                                        static_cast<float>(map.second.grid_y));
+                    terrain::get_height_map(map.height_data, perlin, texture_width, texture_height,
+                                            scale, layer_count, static_cast<float >(map.grid_x),
+                                            static_cast<float>(map.grid_y));
 
-                glBindTexture(GL_TEXTURE_2D, map.second.height_map_id);
-                // to support non-power-of-two heightmap textures
-                glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+                    glBindTexture(GL_TEXTURE_2D, map.height_map_id);
+                    // to support non-power-of-two heightmap textures
+                    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 
-                // use GL_RED format
-                glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texture_width, texture_height, 0, GL_RED, GL_FLOAT,
-                             map.second.height_data.data());
+                    // use GL_RED format
+                    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, texture_width, texture_height, 0, GL_RED, GL_FLOAT,
+                                 map.height_data.data());
 
-                // generate mipmap for texture
-                glGenerateMipmap(GL_TEXTURE_2D);
+                    // generate mipmap for texture
+                    glGenerateMipmap(GL_TEXTURE_2D);
+                }
             }
         }
     };
@@ -329,7 +339,7 @@ int main() {
         // render the triangle
         glBindVertexArray(terrain_vao);
 
-        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 600.0f);
+        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, view_distance);
 
         // camera/view transformation
         glm::mat4 view = cam.get_view_matrix();
@@ -529,37 +539,37 @@ load_chunk(std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::
 }
 
 void load_material_texture(std::vector<unsigned int> &diff_textures) {
-    diff_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_diff_2k.png"));
+    diff_textures.push_back(utilities::load_texture("../assets/images/sand/", "sand_diff.png"));
     diff_textures.push_back(
-            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_diff_2k.png"));
-    diff_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_diff_2k.png"));
-    diff_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_diff_2k.png"));
-    diff_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_col_4k.png"));
+            utilities::load_texture("../assets/images/grass/", "grass_diff.png"));
+    diff_textures.push_back(utilities::load_texture("../assets/images/mud/", "mud_diff.png"));
+    diff_textures.push_back(utilities::load_texture("../assets/images/rock/", "rock_diff.png"));
+    diff_textures.push_back(utilities::load_texture("../assets/images/snow/", "snow_diff.png"));
 }
 
 void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures) {
     load_material_texture(diff_texture);
 
-    norm_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_nor_gl_2k.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/sand/", "sand_nor.png"));
     norm_textures.push_back(
-            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_nor_gl_2k.png"));
+            utilities::load_texture("../assets/images/grass/", "grass_nor.png"));
     norm_textures.push_back(
-            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_nor_gl_2k.png"));
-    norm_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_nor_gl_2k.png"));
-    norm_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_nor_gl_4k.png"));
+            utilities::load_texture("../assets/images/mud/", "mud_nor.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/rock/", "rock_nor.png"));
+    norm_textures.push_back(utilities::load_texture("../assets/images/snow/", "snow_nor.png"));
 }
 
 void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
                            std::vector<unsigned int> &arm_texture) {
     load_material_texture(diff_texture, norm_textures);
 
-    arm_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_arm_2k.png"));
+    arm_texture.push_back(utilities::load_texture("../assets/images/sand/", "sand_arm.png"));
     arm_texture.push_back(
-            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_arm_2k.png"));
+            utilities::load_texture("../assets/images/grass/", "grass_arm.png"));
     arm_texture.push_back(
-            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_arm_2k.png"));
-    arm_texture.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_arm_2k.png"));
-    arm_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_arm_4k.png"));
+            utilities::load_texture("../assets/images/mud/", "mud_arm.png"));
+    arm_texture.push_back(utilities::load_texture("../assets/images/rock/", "rock_arm.png"));
+    arm_texture.push_back(utilities::load_texture("../assets/images/snow/", "snow_arm.png"));
 }
 
 void set_texture(std::vector<unsigned int> &textures, int &texture_index,
