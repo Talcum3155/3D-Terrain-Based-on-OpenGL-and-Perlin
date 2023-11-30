@@ -7,6 +7,7 @@
 #include "terrain/map_chunk.h"
 
 #include <thread>
+#include <queue>
 
 void load_material_texture(std::vector<unsigned int> &diff_texture);
 
@@ -46,6 +47,9 @@ void render_quad();
 void load_chunk(std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> &map_data,
                 bool &game_end, utilities::camera &cam, siv::PerlinNoise &perlin, float &scale, int &layer_count);
 
+void
+load_height_map_task(terrain::map_chunk &chunk);
+
 const int SCR_WIDTH = 1280;
 const int SCR_HEIGHT = 720;
 const unsigned short NUM_PATCH_PTS = 4;
@@ -70,6 +74,8 @@ const int texture_height = map_height + 2;
 const int terrain_height = 400;
 
 const int render_distance = 3;
+
+std::queue<terrain::map_chunk *> main_thread_task;
 
 int main() {
 
@@ -178,6 +184,7 @@ int main() {
     std::thread chunk_loader(load_chunk, std::ref(map_data), std::ref(game_end),
                              std::ref(cam), std::ref(perlin), std::ref(scale), std::ref(layer_count));
     chunk_loader.detach();
+
 
 #pragma region set terrain and pbr texture to shader
 
@@ -322,7 +329,7 @@ int main() {
         // render the triangle
         glBindVertexArray(terrain_vao);
 
-        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 800.0f);
+        glm::mat4 projection = cam.get_projection_matrix(SCR_WIDTH, SCR_HEIGHT, 0.1f, 600.0f);
 
         // camera/view transformation
         glm::mat4 view = cam.get_view_matrix();
@@ -364,13 +371,7 @@ int main() {
 
                 terrain::map_chunk &map = map_data.at({x, y});
 
-                // subthreads cannot access the OpenGL context
-                // so, loading heightmaps should be done in the main thread
-                if (map.height_map_id == 0) {
-                    map.height_map_id = terrain::load_height_map(
-                            texture_width,
-                            texture_height, map.height_data);
-                }
+                if (map.height_map_id == 0) { load_height_map_task(map); }
 
                 glActiveTexture(GL_TEXTURE0);
                 glBindTexture(GL_TEXTURE_2D, map.height_map_id);
@@ -400,20 +401,24 @@ int main() {
                     .set_float("y_value", y_value)
                     .set_float("HEIGHT_SCALE", HEIGHT_SCALE);
 
-            // calculate the model matrix for each object and pass it to shader before drawing
-            for (auto &map: map_data) {
-                glBindTexture(GL_TEXTURE_2D, map.second.height_map_id);
-                model = glm::mat4(1.0f);
-                model = glm::translate(model, glm::vec3
-                        (
-                                map.second.grid_x * map_width,
-                                0,
-                                map.second.grid_y * map_height
-                        ));
-                normal_shader
-                        .set_mat4("model", model);
+            for (int x = current_grid_x - render_distance; x <= current_grid_x + render_distance; ++x) {
+                for (int y = current_grid_y - render_distance; y <= current_grid_y + render_distance; ++y) {
 
-                glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+                    terrain::map_chunk &map = map_data.at({x, y});
+
+                    glBindTexture(GL_TEXTURE_2D, map.height_map_id);
+                    model = glm::mat4(1.0f);
+                    model = glm::translate(model, glm::vec3
+                            (
+                                    map.grid_x * map_width,
+                                    0,
+                                    map.grid_y * map_height
+                            ));
+                    normal_shader
+                            .set_mat4("model", model);
+
+                    glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
+                }
             }
         }
 
@@ -439,13 +444,17 @@ int main() {
         glfwSwapBuffers(window);
         // checks if any events are triggered per frame
         glfwPollEvents();
+
+        // check task end of pre frame
+        if (!main_thread_task.empty()) {
+            load_height_map_task(*main_thread_task.front());
+            main_thread_task.pop();
+        }
     }
 
 #pragma region clean memory
 
     game_end = true;
-    // wait for thread stop
-    chunk_loader.join();
 
     glDeleteVertexArrays(1, &terrain_vao);
     glDeleteBuffers(1, &terrain_vbo);
@@ -469,6 +478,19 @@ int main() {
     return 0;
 }
 
+/**
+ * load height map task for main thread
+ * @param chunk
+ */
+void
+load_height_map_task(terrain::map_chunk &chunk) {
+    // subthreads cannot access the OpenGL context
+    // so, loading heightmaps should be done in the main thread
+    chunk.height_map_id = terrain::load_height_map(
+            texture_width,
+            texture_height, chunk.height_data);
+}
+
 void
 load_chunk(std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> &map_data, bool &game_end,
            utilities::camera &cam, siv::PerlinNoise &perlin, float &scale, int &layer_count) {
@@ -482,8 +504,10 @@ load_chunk(std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::
         int current_grid_x = static_cast<int>(std::trunc(cam.position.x / map_width + 0.5));
         int current_grid_y = static_cast<int>(std::trunc(cam.position.z / map_height + 0.5));
 
-        for (int x = current_grid_x - render_distance - expand_range; x <= current_grid_x + render_distance + expand_range; ++x) {
-            for (int y = current_grid_y - render_distance - expand_range; y <= current_grid_y + render_distance + expand_range; ++y) {
+        for (int x = current_grid_x - render_distance - expand_range;
+             x <= current_grid_x + render_distance + expand_range; ++x) {
+            for (int y = current_grid_y - render_distance - expand_range;
+                 y <= current_grid_y + render_distance + expand_range; ++y) {
 
                 if (!map_data.contains({x, y})) {
 
@@ -493,6 +517,8 @@ load_chunk(std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::
 
                     map_data.insert({std::pair<int, int>(x, y),
                                      terrain::map_chunk(x, y, std::move(height_data))});
+
+                    main_thread_task.push(&map_data.at({x, y}));
                 }
             }
         }
