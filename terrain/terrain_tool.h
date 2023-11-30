@@ -15,6 +15,7 @@
 #include <PerlinNoise.hpp>
 #include <random>
 #include <tuple>
+#include <unordered_map>
 
 namespace terrain {
     void

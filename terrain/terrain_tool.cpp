@@ -87,7 +87,7 @@ namespace terrain {
      */
     unsigned int
     load_height_map(const int &map_width, const int &map_height, std::vector<float> &height_data) {
-        unsigned int texture_id;
+        unsigned int texture_id = 0;
         glGenTextures(1, &texture_id);
         glBindTexture(GL_TEXTURE_2D, texture_id);
         // to support non-power-of-two heightmap textures
