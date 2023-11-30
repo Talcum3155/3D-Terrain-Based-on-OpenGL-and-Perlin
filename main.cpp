@@ -10,13 +10,10 @@
 
 void load_material_texture(std::vector<unsigned int> &diff_texture);
 
-void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures);
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures);
 
-void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
-                           std::vector<unsigned int> &norm_textures);
-
-void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
-                           std::vector<unsigned int> &norm_textures, std::vector<unsigned int> &disp_texture);
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
+                           std::vector<unsigned int> &arm_texture);
 
 void set_texture(std::vector<unsigned int> &textures, int &texture_index, std::string &&texture_name,
                  utilities::shader &shader_program);
@@ -99,13 +96,14 @@ int main() {
     glDepthFunc(GL_LEQUAL);
 
 #pragma region load shader programe
-    utilities::shader_t shader_program(std::string("../shaders/"), std::string("PerlinMap.vert"),
+
+    utilities::shader_t terrain_shader(std::string("../shaders/"), std::string("PerlinMap.vert"),
                                        std::string("PerlinMap.frag"), std::string("PerlinMap.tesc"),
                                        std::string("PerlinMap.tese"));
 
-    utilities::shader_g_t shader_program_debug(std::string("../shaders/"), std::string("NormalTest.vert"),
-                                               std::string("NormalTest.frag"), std::string("NormalTest.tesc"),
-                                               std::string("NormalTest.tese"), std::string("NormalTest.geom"));
+    utilities::shader_g_t normal_shader(std::string("../shaders/"), std::string("NormalTest.vert"),
+                                        std::string("NormalTest.frag"), std::string("NormalTest.tesc"),
+                                        std::string("NormalTest.tese"), std::string("NormalTest.geom"));
 
     utilities::shader cube_map_shader(std::string("../shaders/"), std::string("CubeMap.vert"),
                                       std::string("CubeMap.frag"));
@@ -175,11 +173,11 @@ int main() {
     // Specify the number of vertices per patch
     glPatchParameteri(GL_PATCH_VERTICES, NUM_PATCH_PTS);
 
-    shader_program.use();
-    shader_program.set_int("height_map", 0).set_float("terrain_height", terrain_height);
+    terrain_shader.use();
+    terrain_shader.set_int("height_map", 0).set_float("terrain_height", terrain_height);
 
-    shader_program_debug.use();
-    shader_program_debug.set_int("height_map", 0).set_float("terrain_height", terrain_height);
+    normal_shader.use();
+    normal_shader.set_int("height_map", 0).set_float("terrain_height", terrain_height);
 
 #pragma region hdr texture to sky box
 
@@ -192,22 +190,32 @@ int main() {
 
 #pragma endregion
 
-#pragma region set terrain texture to shader
+#pragma region set terrain and pbr texture to shader
 
     // load texture
     std::vector<unsigned int> diff_textures;
-    std::vector<unsigned int> ao_textures;
     std::vector<unsigned int> norm_texture;
-//    std::vector<unsigned int> disp_texture;
-//    load_material_texture(diff_textures, ao_textures, norm_texture);
+    std::vector<unsigned int> arm_texture;
+    load_material_texture(diff_textures, norm_texture, arm_texture);
 
     int texture_index = 1;
-    shader_program.use();
+    terrain_shader.use();
 
-//    set_texture(diff_textures, texture_index, "diff", shader_program);
-//    set_texture(ao_textures, texture_index, "ao", shader_program);
-//    set_texture(norm_texture, texture_index, "norm", shader_program);
-//    set_texture(disp_texture, texture_index, "disp", shader_program);
+    set_texture(diff_textures, texture_index, "diff", terrain_shader);
+    set_texture(norm_texture, texture_index, "norm", terrain_shader);
+    set_texture(arm_texture, texture_index, "arm", terrain_shader);
+
+    glActiveTexture(GL_TEXTURE0 + texture_index);
+    glBindTexture(GL_TEXTURE_2D, irradiance_map_id);
+    terrain_shader.set_int("irradiance_map", texture_index++);
+
+    glActiveTexture(GL_TEXTURE0 + texture_index);
+    glBindTexture(GL_TEXTURE_2D, prefilter_map_id);
+    terrain_shader.set_int("prefilter_map", texture_index++);
+
+    glActiveTexture(GL_TEXTURE0 + texture_index);
+    glBindTexture(GL_TEXTURE_2D, brdf_lut_map_id);
+    terrain_shader.set_int("brdf_lut", texture_index++);
 
 #pragma endregion set texture to shaders
 
@@ -219,7 +227,7 @@ int main() {
     for (int i = 0; i < height.size(); ++i) {
         // set height data to shader
         std::string uniform_name("material.height[" + std::to_string(i) + "]");
-        shader_program.set_float(uniform_name, height[i]);
+        terrain_shader.set_float(uniform_name, height[i]);
     }
 
 #pragma endregion
@@ -229,11 +237,11 @@ int main() {
     float y_value = 0.005184f;
     float HEIGHT_SCALE = 0.358f;
     bool show_normal = false;
-    bool enable_light = false;
-    bool enable_texture = true;
     bool enable_tangent = false;
     bool use_whiteout = false;
     bool gamma_correction = true;
+    int light_mode = 2;
+    int texture_mode = 2;
     float DISP = 0.1f;
 
     float triplanar_scale = 0.05;
@@ -250,11 +258,15 @@ int main() {
         ImGui::SliderFloat("Y: ", &y_value, 0, 0.01f, "%.6f");
         ImGui::SliderFloat("HEIGHT_SCALE: ", &HEIGHT_SCALE, 0.0f, 1.0f);
         ImGui::Checkbox("Show Normal: ", &show_normal);
-        ImGui::Checkbox("Show Texture: ", &enable_texture);
-        ImGui::Checkbox("Show Lighting: ", &enable_light);
+        ImGui::RadioButton("No Texture: ", &texture_mode, 0);
+        ImGui::RadioButton("General Texture: ", &texture_mode, 1);
+        ImGui::RadioButton("Triplanar Texture: ", &texture_mode, 2);
         ImGui::Checkbox("Enable Tangent: ", &enable_tangent);
         ImGui::Checkbox("Use Whiteout: ", &use_whiteout);
         ImGui::Checkbox("Gamma Correction: ", &gamma_correction);
+        ImGui::RadioButton("No Lighting: ", &light_mode, 0);
+        ImGui::RadioButton("Phong Lighting: ", &light_mode, 1);
+        ImGui::RadioButton("PBR Lighting: ", &light_mode, 2);
 
         ImGui::NewLine();
         ImGui::InputFloat("scale: ", &scale, 0, 0.00005f, "%.6f");
@@ -331,8 +343,8 @@ int main() {
 
 #pragma region render terrain
 
-        shader_program.use();
-        shader_program
+        terrain_shader.use();
+        terrain_shader
                 .set_mat4("projection", projection)
                 .set_mat4("view", view)
                 .set_vec3("light.view_pos", cam.position)
@@ -344,11 +356,11 @@ int main() {
                 .set_float("DISP", DISP)
                 .set_float("material.triplanar_scale", triplanar_scale)
                 .set_int("material.triplanar_sharpness", triplanar_sharpness)
-                .set_bool("enable_light", enable_light)
-                .set_bool("enable_texture", enable_texture)
                 .set_bool("enable_tangent", enable_tangent)
                 .set_bool("use_whiteout", use_whiteout)
-                .set_bool("gamma_correction", gamma_correction);
+                .set_bool("gamma_correction", gamma_correction)
+                .set_int("light_mode", light_mode)
+                .set_int("texture_mode", texture_mode);
 
         for (auto &map: map_data) {
             glActiveTexture(GL_TEXTURE0);
@@ -360,7 +372,7 @@ int main() {
                             0,
                             map.second.grid_y * map_height
                     ));
-            shader_program
+            terrain_shader
                     .set_mat4("model", model);
 
             glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
@@ -371,8 +383,8 @@ int main() {
 #pragma region render normal of terrain
 
         if (show_normal) {
-            shader_program_debug.use();
-            shader_program_debug
+            normal_shader.use();
+            normal_shader
                     .set_mat4("projection", projection)
                     .set_mat4("view", view)
                     .set_float("y_value", y_value)
@@ -388,7 +400,7 @@ int main() {
                                 0,
                                 map.second.grid_y * map_height
                         ));
-                shader_program_debug
+                normal_shader
                         .set_mat4("model", model);
 
                 glDrawArrays(GL_PATCHES, 0, static_cast<GLsizei>(NUM_PATCH_PTS * patch_numbers * patch_numbers));
@@ -423,8 +435,8 @@ int main() {
 
     glDeleteVertexArrays(1, &terrain_vao);
     glDeleteBuffers(1, &terrain_vbo);
-    glDeleteProgram(shader_program.id);
-    glDeleteProgram(shader_program_debug.id);
+    glDeleteProgram(terrain_shader.id);
+    glDeleteProgram(normal_shader.id);
     glDeleteProgram(background_shader.id);
     glDeleteProgram(irradiance_shader.id);
     glDeleteProgram(cube_map_shader.id);
@@ -452,20 +464,8 @@ void load_material_texture(std::vector<unsigned int> &diff_textures) {
     diff_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_col_4k.png"));
 }
 
-void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures) {
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures) {
     load_material_texture(diff_texture);
-
-    ao_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_ao_2k.png"));
-    ao_textures.push_back(
-            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_ao_2k.png"));
-    ao_textures.push_back(utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_ao_2k.png"));
-    ao_textures.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_ao_2k.png"));
-    ao_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_ao_4k.png"));
-}
-
-void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
-                           std::vector<unsigned int> &norm_textures) {
-    load_material_texture(diff_texture, ao_textures);
 
     norm_textures.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_nor_gl_2k.png"));
     norm_textures.push_back(
@@ -476,17 +476,17 @@ void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<
     norm_textures.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_nor_gl_4k.png"));
 }
 
-void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &ao_textures,
-                           std::vector<unsigned int> &norm_textures, std::vector<unsigned int> &disp_texture) {
-    load_material_texture(diff_texture, ao_textures, norm_textures);
+void load_material_texture(std::vector<unsigned int> &diff_texture, std::vector<unsigned int> &norm_textures,
+                           std::vector<unsigned int> &arm_texture) {
+    load_material_texture(diff_texture, norm_textures);
 
-    disp_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_disp_2k.png"));
-    disp_texture.push_back(
-            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_disp_2k.png"));
-    disp_texture.push_back(
-            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_disp_2k.png"));
-    disp_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_height_4k.png"));
+    arm_texture.push_back(utilities::load_texture("../assets/images/coast_sand/", "coast_sand_05_arm_2k.png"));
+    arm_texture.push_back(
+            utilities::load_texture("../assets/images/coast_sand_rocks/", "coast_sand_rocks_02_arm_2k.png"));
+    arm_texture.push_back(
+            utilities::load_texture("../assets/images/forest_ground/", "forest_ground_04_arm_2k.png"));
+    arm_texture.push_back(utilities::load_texture("../assets/images/rock_06/", "rock_06_arm_2k.png"));
+    arm_texture.push_back(utilities::load_texture("../assets/images/snow_field/", "snow_field_aerial_arm_4k.png"));
 }
 
 void set_texture(std::vector<unsigned int> &textures, int &texture_index,
@@ -623,7 +623,7 @@ pbr_pre_process(utilities::shader &cube_map_shader, unsigned int &env_cube_map_i
     // load hdr texture
     stbi_set_flip_vertically_on_load(true);
     unsigned int hdr_texture = utilities::load_texture(std::string("../assets/images/"),
-                                                       std::string("blue_photo_studio_4k.hdr"), true);
+                                                       std::string("farm_field_puresky_4k.hdr"), true);
 
     // fov 90 to capture all scene
     glm::mat4 capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);

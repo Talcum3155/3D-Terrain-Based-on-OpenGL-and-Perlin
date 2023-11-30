@@ -20,8 +20,7 @@ out terrain_data {
 struct terrain_material {
     sampler2D diff[MAX_TEXTURES];
     sampler2D norm[MAX_TEXTURES];
-    sampler2D ao[MAX_TEXTURES];
-    sampler2D disp[MAX_TEXTURES];
+    sampler2D arm[MAX_TEXTURES];
     float height[MAX_TEXTURES + 1];
 
     float triplanar_scale;
@@ -130,22 +129,6 @@ vec4 get_normal(vec2 tex) {
     }
 
     return normalize(base_normal + next_normal);
-}
-
-vec4 get_disp(vec2 tex) {
-    vec4 x_color = texture2D(material.disp[texture_lower_index], data.frag_pos.yz * material.triplanar_scale);
-    vec4 y_color = texture2D(material.disp[texture_lower_index], data.frag_pos.xz * material.triplanar_scale);
-    vec4 z_color = texture2D(material.disp[texture_lower_index], data.frag_pos.xy * material.triplanar_scale);
-
-    vec4 base_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
-
-    x_color = texture2D(material.disp[texture_upper_index], data.frag_pos.yz * material.triplanar_scale);
-    y_color = texture2D(material.disp[texture_upper_index], data.frag_pos.xz * material.triplanar_scale);
-    z_color = texture2D(material.disp[texture_upper_index], data.frag_pos.xy * material.triplanar_scale);
-
-    vec4 next_color = x_color * weights.x + y_color * weights.y + z_color * weights.z;
-
-    return mix(base_color, next_color, smoothstep(lower_bound, upper_bound, data.height_01));
 }
 
 void compute_normal_weight() {
