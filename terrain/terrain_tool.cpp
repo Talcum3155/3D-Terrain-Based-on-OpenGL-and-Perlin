@@ -212,6 +212,11 @@ namespace terrain {
         return static_cast<float>((value > 0.0f)) - static_cast<float>(value < 0.0f);
     }
 
+    /**
+     * create terrain plane
+     * @param vertices
+     * @return vao & vbo
+     */
     std::tuple<unsigned int, unsigned int>
     create_terrain(std::vector<float> &vertices) {
         if (vertices.empty())

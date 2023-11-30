@@ -71,11 +71,11 @@ const int map_height = 256;
 const int texture_width = map_width + 2;
 const int texture_height = map_height + 2;
 
-const int terrain_height = 400;
+const int terrain_height = 600;
 
 const int render_distance = 3;
 
-const int view_distance = 800;
+const int view_distance = 1000;
 
 std::queue<terrain::map_chunk *> main_thread_task;
 
@@ -149,7 +149,7 @@ int main() {
 
 #pragma region generate height data
 
-    siv::PerlinNoise::seed_type seed(123456u);
+    siv::PerlinNoise::seed_type seed(7961148u);
     siv::PerlinNoise perlin(seed);
 
     std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> map_data;
@@ -359,7 +359,6 @@ int main() {
                 .set_float("light.ambient_strength", ambient_strength)
                 .set_float("y_value", y_value)
                 .set_float("HEIGHT_SCALE", HEIGHT_SCALE)
-                .set_float("DISP", DISP)
                 .set_float("material.triplanar_scale", triplanar_scale)
                 .set_int("material.triplanar_sharpness", triplanar_sharpness)
                 .set_bool("enable_tangent", enable_tangent)
@@ -443,7 +442,7 @@ int main() {
                 .set_mat4("view", view);
         // bind texture0 to cube map
         glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map_id);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, env_cube_map_id);
         render_cube();
 
 #pragma endregion
@@ -473,6 +472,8 @@ int main() {
     glDeleteProgram(background_shader.id);
     glDeleteProgram(irradiance_shader.id);
     glDeleteProgram(cube_map_shader.id);
+    glDeleteProgram(brdf_lut_shader.id);
+    glDeleteProgram(prefilter_shader.id);
     glDeleteFramebuffers(1, &capture_fbo);
     glDeleteRenderbuffers(1, &capture_rbo);
 
@@ -501,6 +502,15 @@ load_height_map_task(terrain::map_chunk &chunk) {
             texture_height, chunk.height_data);
 }
 
+/**
+ * Subthreads continuously calculate data for surrounding map tiles by a few units
+ * @param map_data store coords
+ * @param game_end be used to stop subthreads
+ * @param cam camera to get position
+ * @param perlin perlin algorithm
+ * @param scale perlin scale
+ * @param layer_count perlin layer count
+ */
 void
 load_chunk(std::unordered_map<std::pair<int, int>, terrain::map_chunk, terrain::pair_hash> &map_data, bool &game_end,
            utilities::camera &cam, siv::PerlinNoise &perlin, float &scale, int &layer_count) {
